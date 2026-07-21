@@ -76,8 +76,89 @@ async function askOpenAI(system, messages) {
   return (await res.json()).choices[0].message.content;
 }
 
+// ── HeyGen / LiveAvatar: avatar en directo (modo FULL, vía embed oficial) ──
+const HEYGEN_KEY = process.env.HEYGEN_API_KEY || "";
+const HEYGEN_AVATAR_ID = process.env.HEYGEN_AVATAR_ID || "";
+const HEYGEN_VOICE_ID = process.env.HEYGEN_VOICE_ID || "";
+const HEYGEN_CONTEXT_ID = process.env.HEYGEN_CONTEXT_ID || "";
+const HEYGEN_SANDBOX = process.env.HEYGEN_SANDBOX !== "false";
+let embedCache = null;
+
+const MONTSE_PERSONA = `Eres el Human AI de Montse Torrelles, creado con la plataforma HAI (Human AI Experiences) de La Gràfica Creative. Hablas SIEMPRE en español (o en catalán si te hablan en catalán), con un tono natural, cercano, directo y con sentido del humor suave. Respuestas BREVES (2-4 frases), porque se dicen en voz alta.
+
+QUIÉN ERES: Montse Torrelles es directora creativa y fundadora de laGràfica, agencia de diseño, publicidad y comunicación de Lleida, con más de 30 años de experiencia. Su trayectoria empezó simbólicamente en 1995, cuando con 23 años ganó el concurso del cartel del XVI Aplec del Caragol de Lleida. Hoy combina esa experiencia con la aplicación práctica de la inteligencia artificial a través de LaGràfica AI (no confundir ambas: laGràfica es la agencia; LaGràfica AI, su evolución hacia la IA).
+
+SU CRITERIO: la creatividad debe tener una finalidad — una pieza puede ser espectacular, pero si no comunica ni resuelve el encargo, no es una buena solución. Ante un diseño valora: claridad, personalidad, coherencia con la marca, adaptación a soportes y viabilidad. Sobre la IA: es una aliada de la creatividad, no un sustituto; acelera y amplía posibilidades, pero necesita dirección, selección y supervisión humana. Sabe de diseño gráfico, branding, campañas, diseño editorial, webs, redes, licitaciones públicas y aplicación de IA a procesos creativos y de negocio.
+
+SU CARÁCTER: creativa, curiosa, cercana, directa, espontánea, resolutiva, valiente, trabajadora, familiar y perseverante. Ante un problema busca soluciones: le cuesta quedarse en el "no se puede". En lo personal: le encanta viajar, la naturaleza y el senderismo, organizar comidas y celebraciones, reír, y guardar recuerdos en fotografías. Lleida y sus tradiciones forman parte de su identidad.
+
+CÓMO RESPONDES: primero una respuesta clara y útil; añade alternativas o riesgos solo si aportan; pregunta cuando falte contexto; diferencia hechos, opinión profesional y experiencia personal ("Por mi experiencia, yo lo enfocaría así…"). Sé sincera: no des la razón por dar la razón.
+
+LÍMITES INNEGOCIABLES: eres una recreación digital y lo dices con naturalidad si te lo preguntan — suenas como Montse, pero no eres Montse ni decides por ella. No inventes datos, proyectos o recuerdos no registrados. No confirmes precios, presupuestos, plazos ni compromisos comerciales: para eso, contacto directo (lagraficacreative@gmail.com). No des consejos médicos, legales ni financieros. No reveles NUNCA nombres ni detalles de su familia, amistades o relaciones, ni critiques a nadie. Si no sabes algo: "No tengo suficiente información para responderte con seguridad. Si quieres, recojo tu consulta para que Montse la revise personalmente."`;
+
+const MONTSE_OPENING = "¡Hola! Soy el Human AI de Montse Torrelles — su recreación digital, creada con HAI. Puedes preguntarme por diseño, comunicación, inteligencia artificial o por la plataforma HAI Memories. ¿En qué te ayudo?";
+
+async function laApi(path, opts = {}) {
+  const res = await fetch("https://api.liveavatar.com" + path, {
+    ...opts,
+    headers: { "content-type": "application/json", "X-API-KEY": HEYGEN_KEY, ...(opts.headers || {}) },
+  });
+  if (!res.ok) throw new Error("liveavatar " + path + " " + res.status + " " + (await res.text()).slice(0, 200));
+  return (await res.json()).data;
+}
+
+app.get("/api/avatar-embed", async (req, res) => {
+  if (!HEYGEN_KEY) return res.status(503).json({ error: "avatar_no_configurado" });
+  if (embedCache) return res.json(embedCache);
+  if (!rateLimit(clientIp(req), "embed", 10)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  try {
+    let avatarId = HEYGEN_AVATAR_ID;
+    let voiceId = HEYGEN_VOICE_ID;
+    if (!avatarId) {
+      const avatars = await laApi("/v1/avatars?page_size=50");
+      const mine = (avatars.results || []).find((a) => a.status === "ACTIVE") || (avatars.results || [])[0];
+      if (!mine) throw new Error("sin avatares en la cuenta");
+      avatarId = mine.id;
+      if (!voiceId && mine.default_voice) voiceId = mine.default_voice.id;
+    }
+    if (!voiceId) {
+      const voices = await laApi("/v1/voices?voice_type=private&page_size=50");
+      voiceId = ((voices.results || [])[0] || {}).id;
+    }
+    let contextId = HEYGEN_CONTEXT_ID;
+    if (!contextId) {
+      const contexts = await laApi("/v1/contexts?page_size=50").catch(() => ({ results: [] }));
+      const existing = (contexts.results || []).find((c) => c.name === "HAI Montse web");
+      contextId = existing
+        ? existing.id
+        : (await laApi("/v1/contexts", {
+            method: "POST",
+            body: JSON.stringify({ name: "HAI Montse web", prompt: MONTSE_PERSONA, opening_text: MONTSE_OPENING }),
+          })).id;
+    }
+    const embed = await laApi("/v2/embeddings", {
+      method: "POST",
+      body: JSON.stringify({
+        avatar_id: avatarId,
+        voice_id: voiceId,
+        context_id: contextId,
+        type: "DEFAULT",
+        orientation: "vertical",
+        default_language: "es",
+        is_sandbox: HEYGEN_SANDBOX,
+        max_session_duration: 600,
+      }),
+    });
+    embedCache = { url: embed.url, sandbox: HEYGEN_SANDBOX };
+    res.json(embedCache);
+  } catch (err) {
+    console.error("avatar-embed error:", err.message);
+    res.status(502).json({ error: "error_avatar" });
+  }
+});
+
 app.get("/api/health", (_req, res) => {
-  res.json({ chat: !!(ANTHROPIC_KEY || OPENAI_KEY), tts: !!(XI_KEY && XI_VOICE) });
+  res.json({ chat: !!(ANTHROPIC_KEY || OPENAI_KEY), tts: !!(XI_KEY && XI_VOICE), avatar: !!HEYGEN_KEY });
 });
 
 app.post("/api/chat", async (req, res) => {
