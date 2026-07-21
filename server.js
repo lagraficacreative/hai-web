@@ -1,14 +1,19 @@
-// HAI Memories — web + "cerebro" (chat IA y voz clonada)
+// HAI Memories — web + "cerebro" (chat IA, voz clonada, avatar en directo y cuentas de usuario)
 // Las claves llegan por variables de entorno (secretos de Coolify), nunca van en el repo:
-//   ANTHROPIC_API_KEY  u  OPENAI_API_KEY   → chat (/api/chat)
+//   ANTHROPIC_API_KEY  u  OPENAI_API_KEY   → chat (/api/chat y chat privado)
 //   ELEVENLABS_API_KEY + ELEVENLABS_VOICE_ID → voz (/api/tts)
-// Opcionales: ANTHROPIC_MODEL, OPENAI_MODEL, PORT
+//   HEYGEN_API_KEY → avatar en directo (/api/avatar-embed)
+//   SESSION_SECRET → firma de sesiones (recomendado fijarlo)
+// Datos de usuarios en SQLite: DATA_DIR (montar volumen persistente en Coolify → /app/data)
 
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
+const { DatabaseSync } = require("node:sqlite");
 
 const app = express();
-app.use(express.json({ limit: "64kb" }));
+app.use(express.json({ limit: "600kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "";
@@ -17,14 +22,90 @@ const XI_KEY = process.env.ELEVENLABS_API_KEY || "";
 const XI_VOICE = process.env.ELEVENLABS_VOICE_ID || "";
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 
-// ── Límite de uso por visitante (en memoria; se reinicia con el contenedor) ──
+// ── Base de datos (SQLite integrada en Node, sin dependencias nativas) ──
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+fs.mkdirSync(DATA_DIR, { recursive: true });
+const db = new DatabaseSync(path.join(DATA_DIR, "hai.db"));
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS humans (
+    user_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT 'Mi Human AI',
+    bio TEXT NOT NULL DEFAULT '',
+    photo TEXT NOT NULL DEFAULT '',
+    voice_id TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id);
+`);
+
+// ── Contraseñas (scrypt) y sesiones (cookie httpOnly) ──
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  return salt + ":" + crypto.scryptSync(pw, salt, 64).toString("hex");
+}
+function checkPassword(pw, stored) {
+  const [salt, hash] = stored.split(":");
+  const candidate = crypto.scryptSync(pw, salt, 64);
+  return crypto.timingSafeEqual(candidate, Buffer.from(hash, "hex"));
+}
+function signToken(raw) {
+  return raw + "." + crypto.createHmac("sha256", SESSION_SECRET).update(raw).digest("hex").slice(0, 32);
+}
+function verifyToken(signed) {
+  const i = signed.lastIndexOf(".");
+  if (i < 0) return null;
+  const raw = signed.slice(0, i);
+  return signToken(raw) === signed ? raw : null;
+}
+function setSession(res, userId) {
+  const raw = crypto.randomBytes(24).toString("hex");
+  db.prepare("INSERT INTO sessions (token, user_id) VALUES (?, ?)").run(raw, userId);
+  res.setHeader("Set-Cookie", `hai_session=${signToken(raw)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000; Secure`);
+}
+function currentUser(req) {
+  const cookie = (req.headers.cookie || "").split(";").map((c) => c.trim()).find((c) => c.startsWith("hai_session="));
+  if (!cookie) return null;
+  const raw = verifyToken(cookie.slice("hai_session=".length));
+  if (!raw) return null;
+  const row = db.prepare(
+    "SELECT u.id, u.email, u.name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?"
+  ).get(raw);
+  return row || null;
+}
+function requireUser(req, res) {
+  const user = currentUser(req);
+  if (!user) { res.status(401).json({ error: "no_autenticado" }); return null; }
+  return user;
+}
+
+// ── Límite de uso (en memoria) ──
 const buckets = new Map();
-function rateLimit(ip, kind, max) {
+function rateLimit(key, kind, max) {
   const now = Date.now();
-  const key = ip + ":" + kind;
-  let b = buckets.get(key);
-  if (!b || now > b.resetAt) { b = { count: 0, resetAt: now + 3600_000 }; buckets.set(key, b); }
+  const k = key + ":" + kind;
+  let b = buckets.get(k);
+  if (!b || now > b.resetAt) { b = { count: 0, resetAt: now + 3600_000 }; buckets.set(k, b); }
   b.count++;
   if (buckets.size > 5000) buckets.clear();
   return b.count <= max;
@@ -76,6 +157,199 @@ async function askOpenAI(system, messages) {
   return (await res.json()).choices[0].message.content;
 }
 
+async function askLLM(system, messages) {
+  return ANTHROPIC_KEY ? askAnthropic(system, messages) : askOpenAI(system, messages);
+}
+
+async function elevenlabsTts(text, voiceId) {
+  const r = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + voiceId, {
+    method: "POST",
+    headers: { "content-type": "application/json", "xi-api-key": XI_KEY },
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: { stability: 0.5, similarity_boost: 0.8 },
+    }),
+  });
+  if (!r.ok) throw new Error("elevenlabs " + r.status);
+  return Buffer.from(await r.arrayBuffer());
+}
+
+// ── Cuentas de usuario ──
+app.post("/api/auth/register", (req, res) => {
+  if (!rateLimit(clientIp(req), "register", 10)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const { email, password, name } = req.body || {};
+  const mail = String(email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) return res.status(400).json({ error: "email_invalido" });
+  if (typeof password !== "string" || password.length < 8) return res.status(400).json({ error: "password_corta" });
+  try {
+    const info = db.prepare("INSERT INTO users (email, password, name) VALUES (?, ?, ?)").run(
+      mail, hashPassword(password), String(name || "").slice(0, 80)
+    );
+    setSession(res, Number(info.lastInsertRowid));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(409).json({ error: "email_ya_registrado" });
+  }
+});
+
+app.post("/api/auth/login", (req, res) => {
+  if (!rateLimit(clientIp(req), "login", 20)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const { email, password } = req.body || {};
+  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(String(email || "").trim().toLowerCase());
+  if (!user || !checkPassword(String(password || ""), user.password)) {
+    return res.status(401).json({ error: "credenciales_invalidas" });
+  }
+  setSession(res, user.id);
+  res.json({ ok: true });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  const cookie = (req.headers.cookie || "").split(";").map((c) => c.trim()).find((c) => c.startsWith("hai_session="));
+  if (cookie) {
+    const raw = verifyToken(cookie.slice("hai_session=".length));
+    if (raw) db.prepare("DELETE FROM sessions WHERE token = ?").run(raw);
+  }
+  res.setHeader("Set-Cookie", "hai_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure");
+  res.json({ ok: true });
+});
+
+app.get("/api/auth/me", (req, res) => {
+  const user = currentUser(req);
+  if (!user) return res.status(401).json({ error: "no_autenticado" });
+  res.json({ user });
+});
+
+// ── El Human AI privado de cada usuario ──
+app.get("/api/human", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const human = db.prepare("SELECT name, bio, photo, voice_id FROM humans WHERE user_id = ?").get(user.id) ||
+    { name: "Mi Human AI", bio: "", photo: "", voice_id: "" };
+  res.json({ human });
+});
+
+app.put("/api/human", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const b = req.body || {};
+  const name = String(b.name || "Mi Human AI").slice(0, 80);
+  const bio = String(b.bio || "").slice(0, 8000);
+  const photo = String(b.photo || "").slice(0, 400000);
+  if (photo && !photo.startsWith("data:image/")) return res.status(400).json({ error: "foto_invalida" });
+  const voiceId = String(b.voiceId || "").slice(0, 64);
+  db.prepare(`
+    INSERT INTO humans (user_id, name, bio, photo, voice_id, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET name=excluded.name, bio=excluded.bio, photo=excluded.photo,
+      voice_id=excluded.voice_id, updated_at=datetime('now')
+  `).run(user.id, name, bio, photo, voiceId);
+  res.json({ ok: true });
+});
+
+app.get("/api/human/messages", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const rows = db.prepare(
+    "SELECT role, content FROM messages WHERE user_id = ? ORDER BY id DESC LIMIT 50"
+  ).all(user.id).reverse();
+  res.json({ messages: rows });
+});
+
+app.post("/api/human/chat", async (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (!ANTHROPIC_KEY && !OPENAI_KEY) return res.status(503).json({ error: "chat_no_configurado" });
+  if (!rateLimit("u" + user.id, "chat", 60)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const text = String((req.body || {}).text || "").trim().slice(0, 600);
+  if (!text) return res.status(400).json({ error: "texto_vacio" });
+
+  const human = db.prepare("SELECT name, bio FROM humans WHERE user_id = ?").get(user.id) ||
+    { name: "Mi Human AI", bio: "" };
+  const persona = [
+    "Eres " + human.name + ", un Human AI privado creado en la plataforma HAI por " + (user.name || "tu familia") + ".",
+    "Hablas SIEMPRE en español (o catalán si te hablan en catalán), natural, cercano y BREVE (2-4 frases).",
+    human.bio ? "Tu historia y personalidad:\n" + human.bio : "Aún no te han contado tu historia: invita con cariño a rellenarla en el apartado ⚙️ de esta página.",
+  ].join("\n\n");
+
+  const prior = db.prepare(
+    "SELECT role, content FROM messages WHERE user_id = ? ORDER BY id DESC LIMIT 10"
+  ).all(user.id).reverse();
+
+  try {
+    const reply = await askLLM(persona + "\n\n" + GUARDRAILS, [...prior, { role: "user", content: text }]);
+    const ins = db.prepare("INSERT INTO messages (user_id, role, content) VALUES (?, ?, ?)");
+    ins.run(user.id, "user", text);
+    ins.run(user.id, "assistant", reply);
+    res.json({ reply });
+  } catch (err) {
+    console.error("private chat error:", err.message);
+    res.status(502).json({ error: "error_ia" });
+  }
+});
+
+app.post("/api/human/tts", async (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (!XI_KEY) return res.status(503).json({ error: "voz_no_configurada" });
+  if (!rateLimit("u" + user.id, "tts", 40)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const text = String((req.body || {}).text || "").slice(0, 600);
+  if (!text.trim()) return res.status(400).json({ error: "texto_vacio" });
+  const human = db.prepare("SELECT voice_id FROM humans WHERE user_id = ?").get(user.id);
+  const voiceId = (human && human.voice_id) || XI_VOICE;
+  if (!voiceId) return res.status(503).json({ error: "voz_no_configurada" });
+  try {
+    const audio = await elevenlabsTts(text, voiceId);
+    res.setHeader("content-type", "audio/mpeg");
+    res.send(audio);
+  } catch (err) {
+    console.error("private tts error:", err.message);
+    res.status(502).json({ error: "error_voz" });
+  }
+});
+
+// ── Chat público de la landing (María) ──
+app.post("/api/chat", async (req, res) => {
+  if (!ANTHROPIC_KEY && !OPENAI_KEY) return res.status(503).json({ error: "chat_no_configurado" });
+  if (!rateLimit(clientIp(req), "chat", 30)) return res.status(429).json({ error: "demasiadas_peticiones" });
+
+  const body = req.body || {};
+  let messages = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+  messages = messages
+    .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 600) }));
+  if (!messages.length || messages[messages.length - 1].role !== "user") {
+    return res.status(400).json({ error: "mensajes_invalidos" });
+  }
+
+  const persona =
+    body.preset === "maria" || !body.persona
+      ? MARIA_PERSONA
+      : String(body.persona).slice(0, 4000);
+
+  try {
+    const reply = await askLLM(persona + "\n\n" + GUARDRAILS, messages);
+    res.json({ reply });
+  } catch (err) {
+    console.error("chat error:", err.message);
+    res.status(502).json({ error: "error_ia" });
+  }
+});
+
+app.post("/api/tts", async (req, res) => {
+  if (!XI_KEY || !XI_VOICE) return res.status(503).json({ error: "voz_no_configurada" });
+  if (!rateLimit(clientIp(req), "tts", 20)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const text = String((req.body || {}).text || "").slice(0, 600);
+  if (!text.trim()) return res.status(400).json({ error: "texto_vacio" });
+  try {
+    const audio = await elevenlabsTts(text, XI_VOICE);
+    res.setHeader("content-type", "audio/mpeg");
+    res.send(audio);
+  } catch (err) {
+    console.error("tts error:", err.message);
+    res.status(502).json({ error: "error_voz" });
+  }
+});
+
 // ── HeyGen / LiveAvatar: avatar en directo (modo FULL, vía embed oficial) ──
 const HEYGEN_KEY = process.env.HEYGEN_API_KEY || "";
 const HEYGEN_AVATAR_ID = process.env.HEYGEN_AVATAR_ID || "";
@@ -98,12 +372,12 @@ LÍMITES INNEGOCIABLES: eres una recreación digital y lo dices con naturalidad 
 
 const MONTSE_OPENING = "¡Hola! Soy el Human AI de Montse Torrelles — su recreación digital, creada con HAI. Puedes preguntarme por diseño, comunicación, inteligencia artificial o por la plataforma HAI Memories. ¿En qué te ayudo?";
 
-async function laApi(path, opts = {}) {
-  const res = await fetch("https://api.liveavatar.com" + path, {
+async function laApi(pathName, opts = {}) {
+  const res = await fetch("https://api.liveavatar.com" + pathName, {
     ...opts,
     headers: { "content-type": "application/json", "X-API-KEY": HEYGEN_KEY, ...(opts.headers || {}) },
   });
-  if (!res.ok) throw new Error("liveavatar " + path + " " + res.status + " " + (await res.text()).slice(0, 200));
+  if (!res.ok) throw new Error("liveavatar " + pathName + " " + res.status + " " + (await res.text()).slice(0, 200));
   return (await res.json()).data;
 }
 
@@ -158,63 +432,12 @@ app.get("/api/avatar-embed", async (req, res) => {
 });
 
 app.get("/api/health", (_req, res) => {
-  res.json({ chat: !!(ANTHROPIC_KEY || OPENAI_KEY), tts: !!(XI_KEY && XI_VOICE), avatar: !!HEYGEN_KEY });
-});
-
-app.post("/api/chat", async (req, res) => {
-  if (!ANTHROPIC_KEY && !OPENAI_KEY) return res.status(503).json({ error: "chat_no_configurado" });
-  if (!rateLimit(clientIp(req), "chat", 30)) return res.status(429).json({ error: "demasiadas_peticiones" });
-
-  const body = req.body || {};
-  let messages = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
-  messages = messages
-    .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
-    .map((m) => ({ role: m.role, content: m.content.slice(0, 600) }));
-  if (!messages.length || messages[messages.length - 1].role !== "user") {
-    return res.status(400).json({ error: "mensajes_invalidos" });
-  }
-
-  const persona =
-    body.preset === "maria" || !body.persona
-      ? MARIA_PERSONA
-      : String(body.persona).slice(0, 4000);
-  const system = persona + "\n\n" + GUARDRAILS;
-
-  try {
-    const reply = ANTHROPIC_KEY
-      ? await askAnthropic(system, messages)
-      : await askOpenAI(system, messages);
-    res.json({ reply });
-  } catch (err) {
-    console.error("chat error:", err.message);
-    res.status(502).json({ error: "error_ia" });
-  }
-});
-
-app.post("/api/tts", async (req, res) => {
-  if (!XI_KEY || !XI_VOICE) return res.status(503).json({ error: "voz_no_configurada" });
-  if (!rateLimit(clientIp(req), "tts", 20)) return res.status(429).json({ error: "demasiadas_peticiones" });
-
-  const text = String((req.body || {}).text || "").slice(0, 600);
-  if (!text.trim()) return res.status(400).json({ error: "texto_vacio" });
-
-  try {
-    const r = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + XI_VOICE, {
-      method: "POST",
-      headers: { "content-type": "application/json", "xi-api-key": XI_KEY },
-      body: JSON.stringify({
-        text,
-        model_id: "eleven_multilingual_v2",
-        voice_settings: { stability: 0.5, similarity_boost: 0.8 },
-      }),
-    });
-    if (!r.ok) throw new Error("elevenlabs " + r.status);
-    res.setHeader("content-type", "audio/mpeg");
-    res.send(Buffer.from(await r.arrayBuffer()));
-  } catch (err) {
-    console.error("tts error:", err.message);
-    res.status(502).json({ error: "error_voz" });
-  }
+  res.json({
+    chat: !!(ANTHROPIC_KEY || OPENAI_KEY),
+    tts: !!(XI_KEY && XI_VOICE),
+    avatar: !!HEYGEN_KEY,
+    accounts: true,
+  });
 });
 
 const PORT = process.env.PORT || 80;
