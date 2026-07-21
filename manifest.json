@@ -1,0 +1,14 @@
+{
+  "name": "HAI — Human AI Experiences",
+  "short_name": "HAI",
+  "description": "Tu Human AI: escucha, contesta y habla con la voz de quien más quieres.",
+  "start_url": "/demo.html",
+  "display": "standalone",
+  "background_color": "#0A0A0F",
+  "theme_color": "#0A0A0F",
+  "lang": "es",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

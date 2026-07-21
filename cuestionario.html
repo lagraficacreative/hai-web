@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HAI Memories · Cuestionario de recuerdos</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#0A0A0F; --surface:#12121A; --surface2:#1A1A26; --border:#26263A;
+    --text:#F4F4F8; --dim:#9A9AB0; --primary:#7C6AF7; --glow:#A78BFA;
+    --accent:#22D3EE; --success:#34D399; --danger:#F87171;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:"Inter",system-ui,sans-serif;line-height:1.55;min-height:100vh}
+  h1,h2,h3{font-family:"Sora",sans-serif;letter-spacing:-.02em}
+  .container{max-width:720px;margin:0 auto;padding:0 20px 80px}
+  header{text-align:center;padding:40px 20px 24px}
+  .logo{font-family:"Sora";font-weight:700;font-size:22px}
+  .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header p{color:var(--dim);font-size:14px;margin-top:6px;max-width:520px;margin-left:auto;margin-right:auto}
+
+  /* Stepper */
+  .stepper{display:flex;gap:6px;margin:24px 0 28px}
+  .step-dot{flex:1;height:5px;border-radius:99px;background:var(--surface2);transition:background .3s}
+  .step-dot.done{background:linear-gradient(135deg,#7C6AF7,#22D3EE)}
+  .step-label{text-align:center;color:var(--dim);font-size:13px;margin-bottom:20px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px}
+  .card h2{font-size:20px;margin-bottom:6px}
+  .card > p.sub{color:var(--dim);font-size:14px;margin-bottom:22px}
+
+  label{display:block;font-size:13px;font-weight:600;margin:16px 0 6px}
+  label small{color:var(--dim);font-weight:400}
+  input[type=text],input[type=date],input[type=url],textarea,select{
+    width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;
+    color:var(--text);padding:11px 14px;font-size:14px;font-family:inherit}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary)}
+  textarea{min-height:96px;resize:vertical}
+  .hint{color:var(--dim);font-size:12px;margin-top:5px;line-height:1.5}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:560px){.row{grid-template-columns:1fr}}
+
+  .slider-row{display:flex;align-items:center;gap:14px;margin-top:8px}
+  .slider-row span{font-size:12px;color:var(--dim);width:80px}
+  .slider-row input[type=range]{flex:1;accent-color:#7C6AF7}
+
+  .choice{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .choice label{display:flex;align-items:center;gap:8px;font-weight:400;font-size:14px;margin:0;
+    border:1px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;background:var(--bg)}
+  .choice input{accent-color:#7C6AF7}
+  .check{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:13px;color:var(--dim)}
+  .check input{margin-top:3px;accent-color:#7C6AF7;flex-shrink:0}
+
+  .file-zone{border:1px dashed var(--border);border-radius:12px;padding:18px;text-align:center;color:var(--dim);font-size:13px;cursor:pointer;margin-top:6px;transition:border-color .2s}
+  .file-zone:hover{border-color:var(--primary)}
+  .file-list{margin-top:10px;font-size:12px;color:var(--dim);text-align:left}
+  .file-list div{padding:4px 0;border-bottom:1px solid var(--surface2)}
+
+  .btn{display:inline-block;border:none;cursor:pointer;font-family:"Inter";font-weight:600;font-size:15px;border-radius:10px;padding:13px 26px;transition:all .15s}
+  .btn-primary{background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff;box-shadow:0 0 24px rgba(124,106,247,.3)}
+  .btn-primary:hover{filter:brightness(1.08)}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .btn-secondary:hover{border-color:rgba(124,106,247,.5)}
+  .nav-btns{display:flex;justify-content:space-between;margin-top:24px}
+  .warn-note{background:rgba(34,211,238,.06);border:1px solid rgba(34,211,238,.25);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--dim);margin-top:18px}
+  .ok{color:var(--success)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span class="grad-text">HAI</span> Memories</div>
+  <p><strong style="color:var(--text)">Cuestionario de recuerdos.</strong> Todo lo que nos cuentes aquí dará vida al Human AI de tu ser querido. Tómate tu tiempo: cada detalle cuenta.</p>
+</header>
+
+<div class="container">
+  <div class="stepper" id="stepper"></div>
+  <div class="step-label" id="stepLabel"></div>
+  <div id="steps"></div>
+  <div class="nav-btns">
+    <button class="btn btn-secondary" id="prevBtn">← Atrás</button>
+    <button class="btn btn-primary" id="nextBtn">Continuar →</button>
+  </div>
+  <p class="hint" style="text-align:center;margin-top:16px">Tus respuestas no salen de esta página hasta que tú decidas enviarlas. No cierres la pestaña sin descargar tu resumen (paso final).</p>
+</div>
+
+<script>
+(function () {
+  const STEPS = [
+    { id: "quien", title: "1 de 8 · Quién es" },
+    { id: "historia", title: "2 de 8 · Su historia" },
+    { id: "trayectoria", title: "3 de 8 · Su trayectoria profesional" },
+    { id: "personalidad", title: "4 de 8 · Su forma de ser y de comunicar" },
+    { id: "memoria", title: "5 de 8 · Sus recuerdos" },
+    { id: "redes", title: "6 de 8 · Sus redes sociales" },
+    { id: "material", title: "7 de 8 · Fotos, vídeos y voz" },
+    { id: "consentimiento", title: "8 de 8 · Consentimiento y envío" },
+  ];
+  let current = 0;
+  const data = { fotos: [], videos: [], audios: [] };
+
+  const stepsEl = document.getElementById("steps");
+  const stepperEl = document.getElementById("stepper");
+  const stepLabel = document.getElementById("stepLabel");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+
+  STEPS.forEach(() => {
+    const d = document.createElement("div");
+    d.className = "step-dot";
+    stepperEl.appendChild(d);
+  });
+
+  const T = {
+    quien: `
+      <div class="card">
+        <h2>¿A quién vamos a recordar?</h2>
+        <p class="sub">Los datos básicos de la persona.</p>
+        <div class="row">
+          <div><label>Nombre completo</label><input type="text" id="f_nombre" placeholder="p. ej. María Ferrer Soler" /></div>
+          <div><label>¿Cómo la llamaba la familia? <small>(apodo)</small></label><input type="text" id="f_apodo" placeholder="p. ej. la iaia María" /></div>
+        </div>
+        <div class="row">
+          <div><label>Fecha de nacimiento</label><input type="date" id="f_nacimiento" /></div>
+          <div><label>Lugar de nacimiento</label><input type="text" id="f_lugar" placeholder="p. ej. Girona" /></div>
+        </div>
+        <label>¿En qué situación creamos su Human AI?</label>
+        <div class="choice">
+          <label><input type="radio" name="f_modo" value="en_vida" /> En vida: la propia persona participa</label>
+          <label><input type="radio" name="f_modo" value="homenaje" /> Como homenaje: la persona ya no está</label>
+        </div>
+        <label>Tu nombre y relación con la persona</label>
+        <input type="text" id="f_solicitante" placeholder="p. ej. Montse, su nieta" />
+        <label>Email de contacto de la familia</label>
+        <input type="text" id="f_email" placeholder="tu@email.com" />
+      </div>`,
+    historia: `
+      <div class="card">
+        <h2>Su historia</h2>
+        <p class="sub">Cuéntanosla como se la contarías a alguien que no la conoció. No hace falta que sea perfecta: hace falta que sea suya.</p>
+        <label>Su vida en unas líneas <small>(dónde nació, qué vivió, qué le importaba)</small></label>
+        <textarea id="f_biografia" rows="7" placeholder="Nació en... Trabajó de... Lo que más le gustaba era... Siempre contaba que..."></textarea>
+        <label>Las personas importantes de su vida <small>(pareja, hijos, nietos, amigos — y cómo los llamaba)</small></label>
+        <textarea id="f_personas" rows="4" placeholder="Su marido Josep (lo llamaba 'el meu Pep'), sus hijas Anna y Laura..."></textarea>
+        <label>Lugares y fechas que significaban mucho</label>
+        <textarea id="f_lugares" rows="3" placeholder="El pueblo de verano, la casa de la calle Mayor, el 14 de abril (su aniversario de boda)..."></textarea>
+      </div>`,
+    trayectoria: `
+      <div class="card">
+        <h2>Su trayectoria profesional</h2>
+        <p class="sub">A qué dedicó su vida: los trabajos, los logros y las historias que salían de ellos.</p>
+        <label>Estudios y formación <small>(aunque sea "la escuela del pueblo" — todo cuenta)</small></label>
+        <textarea id="f_estudios" rows="2" placeholder="Estudió comercio, aprendió corte y confección con su tía..."></textarea>
+        <label>Trabajos y oficios <small>(qué hizo, dónde, en qué épocas)</small></label>
+        <textarea id="f_trabajos" rows="4" placeholder="Empezó en la mercería de... Luego 30 años en la fábrica de... Montó su propio negocio de..."></textarea>
+        <label>Sus orgullos profesionales <small>(logros, reconocimientos, lo que contaba con brillo en los ojos)</small></label>
+        <textarea id="f_logros" rows="3" placeholder="Sacó adelante la tienda en tiempos difíciles, formó a decenas de aprendices..."></textarea>
+        <label>Anécdotas del trabajo que contaba siempre</label>
+        <textarea id="f_anecdotas_trabajo" rows="4" placeholder="El día que... Aquella clienta que... La huelga del 76 cuando..."></textarea>
+      </div>`,
+    personalidad: `
+      <div class="card">
+        <h2>Su forma de ser</h2>
+        <p class="sub">Esto es lo que hará que suene a ella de verdad.</p>
+        <label>Carácter</label>
+        <div class="slider-row"><span>Seria</span><input type="range" id="f_humor" min="0" max="100" value="50" /><span style="text-align:right">Bromista</span></div>
+        <div class="slider-row"><span>Reservada</span><input type="range" id="f_carino" min="0" max="100" value="50" /><span style="text-align:right">Cariñosa</span></div>
+        <div class="slider-row"><span>Tranquila</span><input type="range" id="f_energia" min="0" max="100" value="50" /><span style="text-align:right">Enérgica</span></div>
+        <label>¿Cómo hablaba? <small>(tono general: pausada, directa, exagerada, tímida...)</small></label>
+        <textarea id="f_habla" rows="3" placeholder="Hablaba pausado, con mucha ironía fina, y siempre acababa con una pregunta..."></textarea>
+        <label>Sus expresiones y muletillas exactas <small>(las frases que la familia reconocería al instante)</small></label>
+        <textarea id="f_muletillas" rows="3" placeholder="'A ver, a ver...', 'cariño', 'ja n'hi ha prou', 'eso lo arreglo yo en un momento'..."></textarea>
+        <label>Idiomas y cómo los mezclaba</label>
+        <textarea id="f_idiomas" rows="2" placeholder="Catalán en casa, castellano con los clientes, palabras en francés de su época en Lyon..."></textarea>
+        <label>¿Cómo escribía mensajes? <small>(WhatsApp, emojis, mayúsculas, faltas entrañables...)</small></label>
+        <textarea id="f_escritura" rows="2" placeholder="Todo en mayúsculas, muchos ❤️, audios larguísimos en vez de escribir..."></textarea>
+        <label>Sus gustos <small>(comida, música, aficiones, equipo, programas)</small></label>
+        <textarea id="f_gustos" rows="4" placeholder="La paella de los domingos, Serrat, el punto de cruz, el Barça..."></textarea>
+        <label>Cosas que NO le gustaban o de las que no hablaría</label>
+        <textarea id="f_evitar" rows="3" placeholder="No soportaba las mentiras, nunca hablaba de política..."></textarea>
+      </div>`,
+    memoria: `
+      <div class="card">
+        <h2>Sus recuerdos</h2>
+        <p class="sub">Las preguntas que su familia le hará. Responde las que puedas — cada una que rellenes es una conversación futura.</p>
+        <label>¿Cuál era su canción favorita, y por qué?</label>
+        <textarea id="f_cancion" rows="2"></textarea>
+        <label>¿Cómo fue su infancia?</label>
+        <textarea id="f_infancia" rows="3"></textarea>
+        <label>¿Cuál fue su primer trabajo? ¿Qué contaba de él?</label>
+        <textarea id="f_trabajo" rows="3"></textarea>
+        <label>¿Cómo conoció a su pareja?</label>
+        <textarea id="f_pareja" rows="3"></textarea>
+        <label>¿Qué consejo repetía siempre?</label>
+        <textarea id="f_consejo" rows="2"></textarea>
+        <label>Una historia que contaba una y otra vez</label>
+        <textarea id="f_historia_tipica" rows="4"></textarea>
+        <label>Otros recuerdos que quieras añadir</label>
+        <textarea id="f_otros" rows="4"></textarea>
+      </div>`,
+    redes: `
+      <div class="card">
+        <h2>Sus redes sociales</h2>
+        <p class="sub">Si tenía perfiles públicos, sus publicaciones nos ayudan a conocer su voz escrita y sus fotos. Pega los enlaces que tengas — todos son opcionales.</p>
+        <label>Facebook</label><input type="url" id="f_facebook" placeholder="https://facebook.com/..." />
+        <label>Instagram</label><input type="url" id="f_instagram" placeholder="https://instagram.com/..." />
+        <label>YouTube <small>(canal o vídeos donde aparezca)</small></label><input type="url" id="f_youtube" placeholder="https://youtube.com/..." />
+        <label>TikTok</label><input type="url" id="f_tiktok" placeholder="https://tiktok.com/@..." />
+        <label>LinkedIn</label><input type="url" id="f_linkedin" placeholder="https://linkedin.com/in/..." />
+        <label>Otros <small>(blog, X/Twitter, prensa donde salió...)</small></label>
+        <textarea id="f_otras_redes" rows="2" placeholder="Un enlace por línea"></textarea>
+        <div class="warn-note">Solo usaremos contenido de perfiles a los que la familia tenga derecho de acceso. Nunca accedemos a cuentas privadas: si hay material dentro, descárgalo y añádelo en el paso siguiente.</div>
+      </div>`,
+    material: `
+      <div class="card">
+        <h2>Fotos, vídeos y su voz</h2>
+        <p class="sub">El material con el que crearemos su imagen y clonaremos su voz. Selecciónalo aquí para hacer inventario y envíanoslo por el enlace que prefieras.</p>
+        <label>Fotografías <small>(ideal: 20-100, variadas, de frente y sonriendo)</small></label>
+        <div class="file-zone" id="zone_fotos">📷 Haz clic para seleccionar fotografías</div>
+        <input type="file" id="f_fotos" accept="image/*" multiple style="display:none" />
+        <div class="file-list" id="list_fotos"></div>
+        <label>Vídeos <small>(donde se la vea y se la oiga hablar — son oro para la voz y los gestos)</small></label>
+        <div class="file-zone" id="zone_videos">🎬 Haz clic para seleccionar vídeos</div>
+        <input type="file" id="f_videos" accept="video/*" multiple style="display:none" />
+        <div class="file-list" id="list_videos"></div>
+        <label>Audios de su voz <small>(notas de voz de WhatsApp, grabaciones — cuanto más limpias, mejor)</small></label>
+        <div class="file-zone" id="zone_audios">🎙️ Haz clic para seleccionar audios</div>
+        <input type="file" id="f_audios" accept="audio/*" multiple style="display:none" />
+        <div class="file-list" id="list_audios"></div>
+        <label>Enlace de descarga del material <small>(Drive, Dropbox, WeTransfer — donde nos lo compartes)</small></label>
+        <input type="url" id="f_enlace_material" placeholder="https://drive.google.com/..." />
+        <div class="warn-note">Los archivos no se suben desde esta página: aquí hacemos el inventario. Súbelos a tu Drive/Dropbox/WeTransfer y pega el enlace compartido arriba. Si lo prefieres, te ayudamos a hacerlo por teléfono.</div>
+      </div>`,
+    consentimiento: `
+      <div class="card">
+        <h2>Consentimiento</h2>
+        <p class="sub">Trabajamos con la memoria de una persona, y eso exige claridad. Léelo con calma.</p>
+        <div class="check"><input type="checkbox" id="c1" /><span>Declaro que tengo derecho a usar este material: soy la propia persona, o su familiar directo / heredero con autorización de la familia.</span></div>
+        <div class="check"><input type="checkbox" id="c2" /><span>Entiendo que el Human AI es una <strong>recreación digital</strong>: la IA genera respuestas a partir de los recuerdos aportados y puede formular frases que la persona nunca dijo textualmente.</span></div>
+        <div class="check"><input type="checkbox" id="c3" /><span>Autorizo la clonación de la voz y la recreación de la imagen exclusivamente para el Human AI de nuestra familia.</span></div>
+        <div class="check"><input type="checkbox" id="c4" /><span>Sé que podemos pedir la modificación o el borrado completo de todos los datos, la voz y la imagen en cualquier momento.</span></div>
+        <label style="margin-top:20px">Firma <small>(escribe tu nombre completo como firma)</small></label>
+        <input type="text" id="f_firma" placeholder="Nombre y apellidos" />
+        <div class="warn-note" id="resumen_final" style="display:none"></div>
+      </div>`,
+  };
+
+  function render() {
+    stepsEl.innerHTML = T[STEPS[current].id];
+    stepLabel.textContent = STEPS[current].title;
+    [...stepperEl.children].forEach((d, i) => d.classList.toggle("done", i <= current));
+    prevBtn.style.visibility = current === 0 ? "hidden" : "visible";
+    nextBtn.textContent = current === STEPS.length - 1 ? "✨ Generar mi resumen" : "Continuar →";
+    restore();
+    if (STEPS[current].id === "material") bindFiles();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  const FIELDS = ["f_nombre","f_apodo","f_nacimiento","f_lugar","f_solicitante","f_email","f_biografia","f_personas","f_lugares","f_estudios","f_trabajos","f_logros","f_anecdotas_trabajo","f_humor","f_carino","f_energia","f_habla","f_muletillas","f_idiomas","f_escritura","f_gustos","f_evitar","f_cancion","f_infancia","f_trabajo","f_pareja","f_consejo","f_historia_tipica","f_otros","f_facebook","f_instagram","f_youtube","f_tiktok","f_linkedin","f_otras_redes","f_enlace_material","f_firma"];
+
+  function save() {
+    FIELDS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) data[id] = el.value;
+    });
+    const modo = document.querySelector('input[name="f_modo"]:checked');
+    if (modo) data.f_modo = modo.value;
+    ["c1","c2","c3","c4"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) data[id] = el.checked;
+    });
+  }
+  function restore() {
+    FIELDS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && data[id] !== undefined) el.value = data[id];
+    });
+    if (data.f_modo) {
+      const el = document.querySelector('input[name="f_modo"][value="' + data.f_modo + '"]');
+      if (el) el.checked = true;
+    }
+    ["c1","c2","c3","c4"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && data[id]) el.checked = true;
+    });
+    ["fotos","videos","audios"].forEach(renderFileList);
+  }
+
+  function bindFiles() {
+    ["fotos","videos","audios"].forEach((kind) => {
+      const zone = document.getElementById("zone_" + kind);
+      const input = document.getElementById("f_" + kind);
+      if (!zone || !input) return;
+      zone.onclick = () => input.click();
+      input.onchange = () => {
+        data[kind] = [...input.files].map((f) => ({ nombre: f.name, tamano: Math.round(f.size / 1024) + " KB" }));
+        renderFileList(kind);
+      };
+    });
+  }
+  function renderFileList(kind) {
+    const list = document.getElementById("list_" + kind);
+    if (!list) return;
+    list.innerHTML = (data[kind] || []).map((f) => "<div>✓ " + f.nombre + " · " + f.tamano + "</div>").join("");
+  }
+
+  prevBtn.onclick = () => { save(); if (current > 0) { current--; render(); } };
+  nextBtn.onclick = () => {
+    save();
+    if (current < STEPS.length - 1) { current++; render(); return; }
+    // Paso final: validar consentimiento y generar resumen
+    if (!(data.c1 && data.c2 && data.c3 && data.c4) || !data.f_firma) {
+      const box = document.getElementById("resumen_final");
+      box.style.display = "block";
+      box.innerHTML = "Para terminar, marca las cuatro casillas de consentimiento y firma con tu nombre.";
+      return;
+    }
+    finish();
+  };
+
+  function finish() {
+    const fecha = new Date().toLocaleString("es-ES");
+    const doc = { plataforma: "HAI Memories — Cuestionario de recuerdos", fecha, ...data };
+    const json = JSON.stringify(doc, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const nombre = (data.f_nombre || "persona").toLowerCase().replace(/[^a-záéíóúñ0-9]+/gi, "-");
+
+    const resumenTxt = [
+      "CUESTIONARIO HAI MEMORIES — " + (data.f_nombre || ""),
+      "Solicitante: " + (data.f_solicitante || "") + " · " + (data.f_email || ""),
+      "Modalidad: " + (data.f_modo === "en_vida" ? "En vida" : "Homenaje"),
+      "Fotos: " + (data.fotos || []).length + " · Vídeos: " + (data.videos || []).length + " · Audios: " + (data.audios || []).length,
+      "Material: " + (data.f_enlace_material || "pendiente de enlace"),
+      "Firmado por: " + data.f_firma + " el " + fecha,
+    ].join("%0D%0A");
+
+    const box = document.getElementById("resumen_final");
+    box.style.display = "block";
+    box.innerHTML =
+      '<p class="ok" style="font-weight:600">✓ Cuestionario completo. Dos pasos para enviarlo:</p>' +
+      '<p style="margin-top:10px">1. <a class="ok" href="' + url + '" download="hai-memorias-' + nombre + '.json" style="text-decoration:underline">Descarga tu archivo de recuerdos</a> y guárdalo.</p>' +
+      '<p style="margin-top:6px">2. <a class="ok" style="text-decoration:underline" href="mailto:lagraficacreative@gmail.com?subject=Cuestionario HAI Memories — ' +
+      encodeURIComponent(data.f_nombre || "") + '&body=' + resumenTxt +
+      '">Envíanos el email de aviso</a> adjuntando ese archivo (y el enlace a tu material si no lo pusiste).</p>' +
+      '<p style="margin-top:10px;color:var(--dim)">En 24-48 h te contactamos para revisar juntos los recuerdos y empezar a crear su Human AI.</p>';
+    nextBtn.style.display = "none";
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
