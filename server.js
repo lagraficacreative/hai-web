@@ -390,13 +390,18 @@ app.get("/api/avatar-embed", async (req, res) => {
     let voiceId = HEYGEN_VOICE_ID;
     if (!avatarId) {
       const avatars = await laApi("/v1/avatars?page_size=50");
-      const mine = (avatars.results || []).find((a) => a.status === "ACTIVE") || (avatars.results || [])[0];
-      if (!mine) throw new Error("sin avatares en la cuenta");
-      avatarId = mine.id;
-      if (!voiceId && mine.default_voice) voiceId = mine.default_voice.id;
+      let chosen = (avatars.results || []).find((a) => a.status === "ACTIVE") || (avatars.results || [])[0];
+      if (!chosen) {
+        // Plan sin avatar propio: usar una presentadora del catálogo público
+        const pub = await laApi("/v1/avatars/public?page_size=50");
+        chosen = (pub.results || []).find((a) => a.status === "ACTIVE") || (pub.results || [])[0];
+      }
+      if (!chosen) throw new Error("sin avatares disponibles");
+      avatarId = chosen.id;
+      if (!voiceId && chosen.default_voice) voiceId = chosen.default_voice.id;
     }
     if (!voiceId) {
-      const voices = await laApi("/v1/voices?voice_type=private&page_size=50");
+      const voices = await laApi("/v1/voices?voice_type=private&page_size=50").catch(() => ({ results: [] }));
       voiceId = ((voices.results || [])[0] || {}).id;
     }
     let contextId = HEYGEN_CONTEXT_ID;
