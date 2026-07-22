@@ -425,7 +425,7 @@ app.get("/api/avatar-embed", async (req, res) => {
         orientation: "vertical",
         default_language: "es",
         is_sandbox: HEYGEN_SANDBOX,
-        max_session_duration: 600,
+        max_session_duration: 300,
       }),
     });
     embedCache = { url: embed.url, sandbox: HEYGEN_SANDBOX };
