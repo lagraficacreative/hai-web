@@ -171,7 +171,7 @@ async function elevenlabsTts(text, voiceId) {
       voice_settings: { stability: 0.5, similarity_boost: 0.8 },
     }),
   });
-  if (!r.ok) throw new Error("elevenlabs " + r.status);
+  if (!r.ok) throw new Error("elevenlabs " + r.status + " " + (await r.text()).slice(0, 300));
   return Buffer.from(await r.arrayBuffer());
 }
 
@@ -303,7 +303,7 @@ app.post("/api/human/tts", async (req, res) => {
     res.send(audio);
   } catch (err) {
     console.error("private tts error:", err.message);
-    res.status(502).json({ error: "error_voz" });
+    res.status(502).json({ error: "error_voz", detail: err.message });
   }
 });
 
@@ -346,7 +346,7 @@ app.post("/api/tts", async (req, res) => {
     res.send(audio);
   } catch (err) {
     console.error("tts error:", err.message);
-    res.status(502).json({ error: "error_voz" });
+    res.status(502).json({ error: "error_voz", detail: err.message });
   }
 });
 
@@ -427,7 +427,7 @@ app.get("/api/avatar-embed", async (req, res) => {
     res.json(embedCache);
   } catch (err) {
     console.error("avatar-embed error:", err.message);
-    res.status(502).json({ error: "error_avatar" });
+    res.status(502).json({ error: "error_avatar", detail: err.message.slice(0, 300) });
   }
 });
 
