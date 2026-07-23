@@ -183,6 +183,24 @@ test("admin: borra un cliente con todos sus datos, pero nunca a administración"
   assert.equal(rr.status, 400);
 });
 
+test("memories: el cuestionario se convierte en la personalidad del Human AI", async () => {
+  // sin respuestas → error claro
+  const vacio = await j("/api/human/from-intake", { method: "POST" });
+  assert.equal(vacio.status, 400);
+  assert.equal((await vacio.json()).error, "cuestionario_vacio");
+  // con respuestas → nombre y bio rellenados (plantilla, al no haber LLM en test)
+  await j("/api/intake", {
+    method: "PUT",
+    body: JSON.stringify({ data: { f_nombre: "María Ferrer", f_apodo: "la iaia María", f_muletillas: "'a ver, a ver', 'cariño'", f_cancion: "Mediterráneo de Serrat" } }),
+  });
+  const r = await j("/api/human/from-intake", { method: "POST" });
+  assert.equal(r.status, 200);
+  const { human } = await r.json();
+  assert.equal(human.name, "la iaia María");
+  assert.match(human.bio, /Mediterráneo/);
+  assert.match(human.bio, /a ver, a ver/);
+});
+
 test("pagos: valida plan, email y aceptación; degrada sin clave de Stripe", async () => {
   const noAcepta = await j("/api/checkout", {
     method: "POST", headers: { cookie: "" },

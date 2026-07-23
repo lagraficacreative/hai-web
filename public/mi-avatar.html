@@ -95,7 +95,11 @@
     <label>Voice ID de ElevenLabs <small>(opcional — su voz clonada; sin él usa la voz general)</small></label>
     <input id="f_voiceId" type="text" placeholder="p. ej. pNInz6obpgDQGcFmaJgB" />
     <p class="hint">Cuanto más rica sea la historia, más se parecerá a la persona. Puedes editarla siempre que quieras.</p>
-    <p style="margin-top:16px"><button class="btn" id="saveBtn" type="button">Guardar</button><span class="saved" id="savedMsg"></span></p>
+    <p style="margin-top:16px">
+      <button class="btn" id="saveBtn" type="button">Guardar</button>
+      <button class="btn btn-ghost" id="fromIntakeBtn" type="button" title="Convierte tus respuestas del cuestionario en su personalidad">✨ Crear desde el cuestionario</button>
+      <span class="saved" id="savedMsg"></span>
+    </p>
   </details>
 </main>
 
@@ -145,7 +149,8 @@
     if (!health.chat) {
       $("state").textContent = "El chat con IA aún no está activado en el servidor.";
     } else if (!human.bio) {
-      $("state").textContent = "Empieza por ⚙️ Editar: cuéntale quién es.";
+      $("state").textContent = "¿Ya rellenaste el cuestionario? Abre ⚙️ Editar y pulsa «✨ Crear desde el cuestionario».";
+      $("settings").open = true;
     } else {
       $("state").textContent = "Listo para conversar.";
     }
@@ -171,6 +176,26 @@
       applyHuman();
     };
     img.src = URL.createObjectURL(f);
+  };
+
+  $("fromIntakeBtn").onclick = async () => {
+    $("fromIntakeBtn").disabled = true;
+    $("savedMsg").textContent = "✨ Creando su personalidad a partir de tus respuestas…";
+    try {
+      const r = await fetch("/api/human/from-intake", { method: "POST" });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || r.status);
+      human = data.human;
+      applyHuman();
+      $("savedMsg").textContent = "✓ Personalidad creada — revísala y guarda los retoques que quieras";
+      if (health.chat) $("state").textContent = "Listo para conversar.";
+    } catch (e) {
+      $("savedMsg").textContent = e.message === "cuestionario_vacio"
+        ? "Aún no hay respuestas en el cuestionario de recuerdos."
+        : "No se ha podido crear. Prueba de nuevo.";
+    }
+    $("fromIntakeBtn").disabled = false;
+    setTimeout(() => { $("savedMsg").textContent = ""; }, 6000);
   };
 
   $("saveBtn").onclick = async () => {

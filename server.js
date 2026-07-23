@@ -206,7 +206,7 @@ const GUARDRAILS = `NORMAS INNEGOCIABLES:
 - Nada de consejos médicos, legales o financieros. Nada de contenido dañino.
 - Responde siempre en español salvo que te hablen en otro idioma.`;
 
-async function askAnthropic(system, messages) {
+async function askAnthropic(system, messages, maxTokens = 300) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -214,20 +214,20 @@ async function askAnthropic(system, messages) {
       "x-api-key": ANTHROPIC_KEY,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 300, system, messages }),
+    body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: maxTokens, system, messages }),
   });
   if (!res.ok) throw new Error("anthropic " + res.status);
   const data = await res.json();
   return data.content.map((c) => c.text || "").join("");
 }
 
-async function askOpenAI(system, messages) {
+async function askOpenAI(system, messages, maxTokens = 300) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer " + OPENAI_KEY },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      max_tokens: 300,
+      max_tokens: maxTokens,
       messages: [{ role: "system", content: system }, ...messages],
     }),
   });
@@ -235,8 +235,8 @@ async function askOpenAI(system, messages) {
   return (await res.json()).choices[0].message.content;
 }
 
-async function askLLM(system, messages) {
-  return ANTHROPIC_KEY ? askAnthropic(system, messages) : askOpenAI(system, messages);
+async function askLLM(system, messages, maxTokens = 300) {
+  return ANTHROPIC_KEY ? askAnthropic(system, messages, maxTokens) : askOpenAI(system, messages, maxTokens);
 }
 
 async function elevenlabsTts(text, voiceId) {
@@ -383,6 +383,58 @@ app.post("/api/human/tts", async (req, res) => {
     console.error("private tts error:", err.message);
     res.status(502).json({ error: "error_voz", detail: err.message });
   }
+});
+
+// Convierte las respuestas del cuestionario de recuerdos en la personalidad
+// del Human AI privado ("humans.bio"), para poder hablar con él sin esperar
+// a la elaboración manual. Si hay LLM, destila una ficha rica; si no, usa
+// una plantilla estructurada con las propias respuestas.
+const INTAKE_LABELS = {
+  f_nombre: "Nombre", f_apodo: "Cómo la llamaba la familia", f_nacimiento: "Nacimiento",
+  f_lugar: "Lugar de nacimiento", f_biografia: "Su historia", f_personas: "Personas importantes y cómo las llamaba",
+  f_lugares: "Lugares y fechas señaladas", f_estudios: "Estudios", f_trabajos: "Trabajos y oficios",
+  f_logros: "Orgullos profesionales", f_anecdotas_trabajo: "Anécdotas del trabajo",
+  f_habla: "Cómo hablaba", f_muletillas: "Muletillas y expresiones exactas", f_idiomas: "Idiomas",
+  f_escritura: "Cómo escribía mensajes", f_gustos: "Gustos", f_evitar: "Lo que no le gustaba / temas a evitar",
+  f_cancion: "Su canción favorita", f_infancia: "Su infancia", f_trabajo: "Su primer trabajo",
+  f_pareja: "Cómo conoció a su pareja", f_consejo: "El consejo que repetía",
+  f_historia_tipica: "La historia que contaba siempre", f_otros: "Otros recuerdos",
+};
+
+app.post("/api/human/from-intake", async (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (!rateLimit("u" + user.id, "from-intake", 10)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const row = db.prepare("SELECT data FROM intake WHERE user_id = ?").get(user.id);
+  const d = row ? JSON.parse(row.data) : {};
+  const lineas = Object.entries(INTAKE_LABELS)
+    .map(([k, label]) => (d[k] && String(d[k]).trim() ? label + ": " + String(d[k]).trim() : null))
+    .filter(Boolean);
+  if (!lineas.length) return res.status(400).json({ error: "cuestionario_vacio" });
+
+  const nombre = (d.f_apodo || d.f_nombre || "Mi Human AI").trim().slice(0, 80);
+  const plantilla = "RESPUESTAS DEL CUESTIONARIO DE RECUERDOS:\n" + lineas.join("\n");
+  let bio = plantilla; // sin LLM, el chat ya funciona con las respuestas en crudo
+  if (ANTHROPIC_KEY || OPENAI_KEY) {
+    try {
+      bio = await askLLM(
+        `Redactas fichas de personalidad para recreaciones digitales respetuosas de HAI Memories.
+A partir de las respuestas del cuestionario que te pasa la familia, escribe la ficha de la persona EN SEGUNDA PERSONA («Eres ${nombre}…»), en español, densa y concreta (400-700 palabras).
+Incluye: quién es y su historia; su forma exacta de hablar (tono y sus muletillas LITERALES); las personas queridas y cómo llama a cada una; sus gustos; las anécdotas y consejos que repite; y los temas que evita.
+REGLAS: no inventes ni un solo dato que no esté en las respuestas; si algo falta, simplemente no lo menciones. No añadas encabezados ni comentarios: solo la ficha.`,
+        [{ role: "user", content: plantilla }],
+        1500
+      );
+    } catch (err) {
+      console.error("from-intake LLM error:", err.message); // seguimos con la plantilla
+    }
+  }
+  db.prepare(`
+    INSERT INTO humans (user_id, name, bio, updated_at) VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET name=excluded.name, bio=excluded.bio, updated_at=datetime('now')
+  `).run(user.id, nombre, bio.slice(0, 8000));
+  const human = db.prepare("SELECT name, bio, photo, voice_id FROM humans WHERE user_id = ?").get(user.id);
+  res.json({ ok: true, human });
 });
 
 // ── Intranet: cuestionario guardado y archivos de recuerdos ──
