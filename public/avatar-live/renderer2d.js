@@ -180,13 +180,14 @@ export class Hybrid2DRenderer {
         0, mouthCY * scale, dw, bandH * scale + drop);
     }
 
-    // Interior de la boca al abrirse
+    // Interior de la boca al abrirse; "round" (0-1) redondea los labios (O/U)
     if (drop > 1) {
-      const mw = id.mouth.w * scale * 0.5 * this.mouth.width;
+      const round = this.mouth.round || 0;
+      const mw = id.mouth.w * scale * 0.5 * this.mouth.width * (1 - 0.38 * round);
       const mx = (id.mouth.x + id.mouth.w / 2) * scale;
       ctx.fillStyle = id.innerMouth || "#331418";
       ctx.beginPath();
-      ctx.ellipse(mx, mouthCY * scale + drop * 0.5, mw, drop * 0.52, 0, 0, Math.PI * 2);
+      ctx.ellipse(mx, mouthCY * scale + drop * 0.5, mw, drop * (0.52 + 0.18 * round), 0, 0, Math.PI * 2);
       ctx.fill();
     }
 

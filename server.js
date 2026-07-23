@@ -13,6 +13,12 @@ const crypto = require("crypto");
 const { DatabaseSync } = require("node:sqlite");
 
 const app = express();
+app.use((_req, res, next) => {
+  // Endurecimiento básico (Fase 5); sin CSP porque la web usa scripts inline
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
 app.use(express.json({ limit: "600kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -102,6 +108,11 @@ db.exec(`
     user_email TEXT NOT NULL,
     action TEXT NOT NULL,
     detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    data TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
@@ -674,6 +685,36 @@ app.get("/api/admin/audit", (req, res) => {
   res.json({ audit: db.prepare("SELECT * FROM audit_log ORDER BY id DESC LIMIT 200").all() });
 });
 
+// ── Métricas de sesiones del avatar (Fase 5): anónimas, sin datos personales ──
+app.post("/api/metrics", (req, res) => {
+  if (!rateLimit(clientIp(req), "metrics", 60)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const json = JSON.stringify(req.body && typeof req.body === "object" ? req.body : {});
+  if (json.length > 2000) return res.status(400).json({ error: "demasiado_grande" });
+  db.prepare("INSERT INTO metrics (data) VALUES (?)").run(json);
+  res.json({ ok: true });
+});
+
+app.get("/api/admin/metrics", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  const rows = db.prepare("SELECT id, data, created_at FROM metrics ORDER BY id DESC LIMIT 200").all()
+    .map((r) => ({ id: r.id, created_at: r.created_at, ...JSON.parse(r.data) }));
+  const nums = (k) => rows.map((r) => r[k]).filter((v) => typeof v === "number");
+  const avg = (a) => (a.length ? Math.round(a.reduce((s, v) => s + v, 0) / a.length) : null);
+  res.json({
+    sessions: rows,
+    resumen: {
+      total: rows.length,
+      msToConnected_media: avg(nums("msToConnected")),
+      msToFirstAudio_media: avg(nums("msToFirstAudio")),
+      duracion_media_ms: avg(nums("durationMs")),
+      fps_media: avg(nums("avgFps")),
+      interrupciones_total: nums("interruptions").reduce((s, v) => s + v, 0),
+      minutos_conversacion_total: Math.round(nums("durationMs").reduce((s, v) => s + v, 0) / 60000),
+    },
+  });
+});
+
 // ── Panel de administración (solo Montse) ──
 app.get("/api/admin/clients", (req, res) => {
   const user = requireUser(req, res);
@@ -889,6 +930,25 @@ app.get("/api/avatar-embed", async (req, res) => {
 const XI_AGENT_ID = process.env.ELEVENLABS_AGENT_ID || "";
 const XI_AGENT_NAME = "HAI asistente web (avatar-live) v1";
 let xiAgentCache = XI_AGENT_ID || null;
+// Eventos que el agente debe emitir al navegador. "alignment" (timing por
+// carácter) alimenta los visemas del lip sync avanzado.
+const XI_CLIENT_EVENTS = ["audio", "interruption", "user_transcript", "agent_response", "agent_response_correction", "alignment"];
+const xiPatchedAgents = new Set();
+// Asegura que un agente ya existente tenga los client_events necesarios
+// (los creados antes de los visemas, o creados a mano en el panel de ElevenLabs).
+async function ensureXiClientEvents(agentId) {
+  if (xiPatchedAgents.has(agentId)) return;
+  try {
+    await xiApi("/v1/convai/agents/" + agentId, {
+      method: "PATCH",
+      body: JSON.stringify({ conversation_config: { conversation: { client_events: XI_CLIENT_EVENTS } } }),
+    });
+    xiPatchedAgents.add(agentId);
+  } catch (err) {
+    // No bloquea la conversación: sin alignment el lip sync cae a energía
+    console.warn("No se han podido actualizar los client_events de", agentId + ":", err.message.slice(0, 160));
+  }
+}
 
 async function xiApi(pathName, opts = {}) {
   const res = await fetch("https://api.elevenlabs.io" + pathName, {
@@ -920,6 +980,7 @@ async function ensureXiAgent() {
         // Los agentes no ingleses exigen turbo o flash v2_5 (el default
         // eleven_flash_v2 es solo inglés y ElevenLabs devuelve 400).
         tts: { model_id: "eleven_flash_v2_5", ...(XI_VOICE ? { voice_id: XI_VOICE } : {}) },
+        conversation: { client_events: XI_CLIENT_EVENTS },
       },
     }),
   });
@@ -942,6 +1003,7 @@ async function ensureAvatarAgent(av) {
           prompt: { prompt: (av.personality || ("Eres " + av.name + ", un Human AI creado con la plataforma HAI.")) + "\n\n" + GUARDRAILS },
         },
         tts: { model_id: "eleven_flash_v2_5", ...((av.voice_id || XI_VOICE) ? { voice_id: av.voice_id || XI_VOICE } : {}) },
+        conversation: { client_events: XI_CLIENT_EVENTS },
       },
     }),
   });
@@ -966,6 +1028,7 @@ app.get("/api/agents/token", async (req, res) => {
     } else {
       agentId = await ensureXiAgent();
     }
+    await ensureXiClientEvents(agentId);
     try {
       // WebRTC (preferido: menos latencia y gestión de audio más robusta)
       const t = await xiApi("/v1/convai/conversation/token?agent_id=" + agentId);

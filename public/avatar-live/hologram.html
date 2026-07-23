@@ -145,8 +145,11 @@
       frames++;
       const now = performance.now();
       if (now - t0 >= 1000) { fps = frames; frames = 0; t0 = now; }
+      const m = avatar.metrics || {};
       debugEl.textContent =
         `estado: ${state}\nvol: ${avatar.getOutputVolume().toFixed(3)}\nfps: ${fps}` +
+        `\nlipsync: ${avatar.lipSyncMode}` +
+        `\nconexión: ${m.msToConnected ?? "—"} ms · 1er audio: ${m.msToFirstAudio ?? "—"} ms` +
         `\nmirror: ${mirror} · scale: ${scale}\nwakeLock: ${!!wakeLock}`;
       requestAnimationFrame(meter);
     })();

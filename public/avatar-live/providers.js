@@ -77,19 +77,15 @@ export class ElevenLabsAgentsProvider extends Emitter {
       },
       onModeChange: ({ mode }) => {
         // El SDK gestiona VAD, turnos e interrupciones; aquí solo traducimos.
-        if (mode === "speaking") {
-          this.emit("state", "speaking");
-        } else {
-          // Si el agente estaba hablando y pasa a escuchar con audio a medias → interrupción
-          if (this.lastMode === "speaking" && this.getOutputVolume() > 0.05) {
-            this.emit("state", "interrupted");
-            setTimeout(() => this.lastMode !== "speaking" && this.emit("state", "listening"), 650);
-          } else {
-            this.emit("state", "listening");
-          }
-        }
+        this.emit("state", mode === "speaking" ? "speaking" : "listening");
         this.lastMode = mode;
       },
+      onInterruption: () => {
+        // Evento nativo del SDK: el usuario ha cortado al agente
+        this.emit("state", "interrupted");
+        setTimeout(() => this.lastMode !== "speaking" && this.emit("state", "listening"), 650);
+      },
+      onAudioAlignment: (a) => this.emit("alignment", a),
       onMessage: (m) => {
         if (!m) return;
         if (m.source === "user") {
@@ -142,6 +138,14 @@ export class DemoProvider extends Emitter {
       await this._wait(1100); if (this.stopped) return;
       this.speaking = true; this.t0 = performance.now();
       this.emit("state", "speaking");
+      // Alignment sintético (frase con vocales variadas) para probar los visemas
+      const frase = "hola soy hai un ser digital que escucha y responde en tiempo real ";
+      const chars = frase.split("");
+      this.emit("alignment", {
+        chars,
+        char_start_times_ms: chars.map((_, i) => i * 72),
+        char_durations_ms: chars.map(() => 72),
+      });
       await this._wait(4800); if (this.stopped) return;
       this.speaking = false;
       this.emit("state", "interrupted");

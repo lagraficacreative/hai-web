@@ -3,7 +3,7 @@
 // Cambiar de motor (p. ej. renderer neuronal WebRTC en Fase 4) = cambiar aquí una clase.
 
 import { Hybrid2DRenderer } from "./renderer2d.js";
-import { EnergyLipSync } from "./lipsync.js";
+import { VisemeLipSync } from "./lipsync.js";
 import { ElevenLabsAgentsProvider, DemoProvider } from "./providers.js";
 
 export const STATES = ["idle", "connecting", "listening", "thinking", "speaking", "interrupted", "error", "ended"];
@@ -51,12 +51,37 @@ export class HaiAvatar {
   async startConversation() {
     if (this.provider) return;
     this.provider = this.demo ? new DemoProvider() : new ElevenLabsAgentsProvider(this.avatarId);
-    this.provider
-      .on("state", (s) => this._setState(s))
-      .on("error", (msg) => this.onError(msg))
-      .on("transcript", (t) => this.onTranscript(t));
 
-    this.lipsync = new EnergyLipSync(
+    // Métricas de la sesión (Fase 5): latencias, fps, interrupciones
+    this.metrics = {
+      startedAt: Date.now(),
+      tStart: performance.now(),
+      msToConnected: null,
+      msToFirstAudio: null,
+      interruptions: 0,
+      alignmentEvents: 0,
+      frames: 0,
+      demo: this.demo,
+      avatarId: this.avatarId || "demo",
+    };
+
+    this.provider
+      .on("state", (s) => {
+        if (s === "listening" && this.metrics.msToConnected === null) {
+          this.metrics.msToConnected = Math.round(performance.now() - this.metrics.tStart);
+        }
+        if (s === "interrupted") this.metrics.interruptions++;
+        this._setState(s);
+      })
+      .on("error", (msg) => this.onError(msg))
+      .on("transcript", (t) => this.onTranscript(t))
+      .on("alignment", (a) => {
+        this.metrics.alignmentEvents++;
+        if (this.lipsync) this.lipsync.addAlignment(a);
+      });
+
+    // Visemas cuando llega alignment; energía como base y red de seguridad
+    this.lipsync = new VisemeLipSync(
       () => (this.provider ? this.provider.getOutputVolume() : 0),
       () => (this.provider ? this.provider.getOutputByteFrequencyData() : null)
     );
@@ -67,6 +92,10 @@ export class HaiAvatar {
       if (!this.provider) return;
       const dt = Math.min(0.05, (now - this.lastT) / 1000);
       this.lastT = now;
+      this.metrics.frames++;
+      if (this.metrics.msToFirstAudio === null && this.provider.getOutputVolume() > 0.02) {
+        this.metrics.msToFirstAudio = Math.round(now - this.metrics.tStart);
+      }
       this.renderer.setMouth(this.lipsync.update(dt));
       this.animRaf = requestAnimationFrame(loop);
     };
@@ -80,10 +109,27 @@ export class HaiAvatar {
     }
   }
 
+  get lipSyncMode() {
+    return this.lipsync && this.lipsync.hasRecentAlignment ? "visemas" : "energía";
+  }
+
+  _sendMetrics() {
+    if (!this.metrics || this.metrics.demo) return;
+    const m = {
+      ...this.metrics,
+      durationMs: Math.round(performance.now() - this.metrics.tStart),
+      avgFps: Math.round(this.metrics.frames / Math.max(1, (performance.now() - this.metrics.tStart) / 1000)),
+    };
+    delete m.tStart; delete m.frames;
+    try { navigator.sendBeacon("/api/metrics", new Blob([JSON.stringify(m)], { type: "application/json" })); } catch (e) {}
+    this.metrics = null;
+  }
+
   get active() { return !!this.provider; }
 
   async stopConversation(toIdle = true) {
     cancelAnimationFrame(this.animRaf);
+    this._sendMetrics();
     const p = this.provider;
     this.provider = null;
     if (this.lipsync) this.lipsync.reset();
