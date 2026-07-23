@@ -57,6 +57,12 @@
   <div class="stepper" id="stepper"></div>
   <div class="step-label" id="stepLabel"></div>
   <div id="stepBox" class="card"></div>
+  <div id="privBox" style="display:none;margin-top:12px">
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--dim);cursor:pointer">
+      <input type="checkbox" id="privCheck" style="margin-top:3px;accent-color:#7C6AF7" />
+      <span>He leído y acepto la <a href="privacidad.html" target="_blank" style="color:var(--accent);text-decoration:underline">política de privacidad</a>: usaremos estos datos solo para responder a tu solicitud.</span>
+    </label>
+  </div>
   <div class="err" id="err"></div>
   <div class="final" id="final"></div>
   <div class="nav-btns">
@@ -212,6 +218,7 @@
     [...$("stepper").children].forEach((d, i) => d.classList.toggle("done", i <= current));
     $("prevBtn").style.visibility = current === 0 ? "hidden" : "visible";
     $("nextBtn").textContent = current === STEPS.length - 1 ? "Enviar solicitud ✨" : "Continuar →";
+    $("privBox").style.display = current === STEPS.length - 1 ? "block" : "none";
     restore();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -249,6 +256,7 @@
     if (missing) { $("err").textContent = "Falta: " + missing; return; }
     $("err").textContent = "";
     if (current < STEPS.length - 1) { current++; render(); return; }
+    if (!$("privCheck").checked) { $("err").textContent = "Para enviar, acepta la política de privacidad."; return; }
     $("nextBtn").disabled = true;
     try {
       const r = await fetch("/api/leads", {

@@ -19,6 +19,9 @@ app.use((_req, res, next) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   next();
 });
+// El webhook de Stripe necesita el cuerpo CRUDO para verificar la firma:
+// se monta antes que express.json (el handler está más abajo, junto a /api/checkout)
+app.post("/api/stripe/webhook", express.raw({ type: "*/*" }), (req, res) => stripeWebhook(req, res));
 app.use(express.json({ limit: "600kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -114,6 +117,16 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     data TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan TEXT NOT NULL,
+    email TEXT NOT NULL,
+    amount_eur INTEGER NOT NULL,
+    session_id TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'created',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
 
@@ -750,6 +763,101 @@ app.get("/api/admin/clients/:id", (req, res) => {
   });
 });
 
+// ── Stripe: tienda de HAI Memories (Checkout alojado por Stripe) ──
+// La tarjeta NUNCA pasa por este servidor: creamos una sesión de Checkout y
+// redirigimos a Stripe. Claves por env: STRIPE_SECRET_KEY (sk_live_/sk_test_)
+// y STRIPE_WEBHOOK_SECRET (whsec_, del endpoint de webhook del panel Stripe).
+const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+const BASE_URL = process.env.PUBLIC_BASE_URL || "https://hai.lagrafica.ai";
+// Planes de Memories (precio anual, IVA incluido) — la única fuente de verdad
+const STRIPE_PLANES = {
+  "presencia-web": { nombre: "HAI Memories · Presencia (Web + App)", eur: 635 },
+  "presencia-holograma": { nombre: "HAI Memories · Presencia con Holograma", eur: 1600 },
+  "memorial-web": { nombre: "HAI Memories · Memorial (Web + App)", eur: 1400 },
+  "memorial-holograma": { nombre: "HAI Memories · Memorial con Holograma", eur: 3000 },
+};
+
+async function stripeApi(pathName, params) {
+  const res = await fetch("https://api.stripe.com" + pathName, {
+    method: "POST",
+    headers: {
+      authorization: "Bearer " + STRIPE_KEY,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams(params).toString(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error("stripe " + pathName + " " + res.status + " " + ((data.error || {}).message || "").slice(0, 200));
+  return data;
+}
+
+app.post("/api/checkout", async (req, res) => {
+  if (!STRIPE_KEY) return res.status(503).json({ error: "pagos_no_configurados" });
+  if (!rateLimit(clientIp(req), "checkout", 15)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const b = req.body || {};
+  const plan = STRIPE_PLANES[b.plan];
+  if (!plan) return res.status(400).json({ error: "plan_invalido" });
+  const email = String(b.email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: "email_invalido" });
+  // Aceptación explícita de condiciones y privacidad, exigida también en servidor
+  if (b.acepta !== true) return res.status(400).json({ error: "falta_aceptacion" });
+  try {
+    const session = await stripeApi("/v1/checkout/sessions", {
+      mode: "subscription",
+      customer_email: email,
+      "line_items[0][quantity]": "1",
+      "line_items[0][price_data][currency]": "eur",
+      "line_items[0][price_data][unit_amount]": String(plan.eur * 100),
+      "line_items[0][price_data][recurring][interval]": "year",
+      "line_items[0][price_data][product_data][name]": plan.nombre,
+      "metadata[plan]": b.plan,
+      "subscription_data[metadata][plan]": b.plan,
+      locale: "es",
+      success_url: BASE_URL + "/pago.html?estado=ok",
+      cancel_url: BASE_URL + "/pago.html?estado=cancelado&plan=" + encodeURIComponent(b.plan),
+    });
+    db.prepare("INSERT INTO orders (plan, email, amount_eur, session_id) VALUES (?, ?, ?, ?)")
+      .run(b.plan, email, plan.eur, session.id);
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error("checkout error:", err.message);
+    res.status(502).json({ error: "error_pago", detail: err.message.slice(0, 200) });
+  }
+});
+
+// Verificación de firma del webhook (HMAC SHA-256 sobre "t.cuerpo_crudo")
+function stripeWebhook(req, res) {
+  if (!STRIPE_WEBHOOK_SECRET) return res.status(503).end();
+  try {
+    const sig = String(req.headers["stripe-signature"] || "");
+    const parts = Object.fromEntries(sig.split(",").map((p) => p.split("=")));
+    const expected = crypto.createHmac("sha256", STRIPE_WEBHOOK_SECRET)
+      .update(parts.t + "." + req.body.toString("utf8")).digest("hex");
+    if (!parts.v1 || !crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(parts.v1))) {
+      return res.status(400).end();
+    }
+    const event = JSON.parse(req.body.toString("utf8"));
+    if (event.type === "checkout.session.completed") {
+      const s = event.data.object;
+      db.prepare("UPDATE orders SET status='paid', updated_at=datetime('now') WHERE session_id = ?").run(s.id);
+      console.log("Pago completado:", (s.metadata || {}).plan, s.customer_email || s.customer_details?.email);
+    } else if (event.type === "checkout.session.expired") {
+      db.prepare("UPDATE orders SET status='expired', updated_at=datetime('now') WHERE session_id = ?").run(event.data.object.id);
+    }
+    res.json({ received: true });
+  } catch (err) {
+    console.error("webhook error:", err.message);
+    res.status(400).end();
+  }
+}
+
+app.get("/api/admin/orders", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  res.json({ orders: db.prepare("SELECT * FROM orders ORDER BY id DESC LIMIT 200").all() });
+});
+
 // Borrado definitivo de un cliente (derecho de supresión): cuenta, sesiones,
 // Human AI, chats, cuestionario y todos sus archivos del disco.
 app.delete("/api/admin/clients/:id", (req, res) => {
@@ -1077,6 +1185,7 @@ app.get("/api/health", (_req, res) => {
     tts: !!(XI_KEY && XI_VOICE),
     avatar: !!HEYGEN_KEY,
     avatarLive: !!XI_KEY,
+    pagos: !!STRIPE_KEY,
     accounts: true,
   });
 });

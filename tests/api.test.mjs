@@ -183,6 +183,19 @@ test("admin: borra un cliente con todos sus datos, pero nunca a administración"
   assert.equal(rr.status, 400);
 });
 
+test("pagos: valida plan, email y aceptación; degrada sin clave de Stripe", async () => {
+  const noAcepta = await j("/api/checkout", {
+    method: "POST", headers: { cookie: "" },
+    body: JSON.stringify({ plan: "presencia-web", email: "a@b.com" }),
+  });
+  // sin STRIPE_SECRET_KEY el servidor responde 503 antes de validar nada más
+  assert.equal(noAcepta.status, 503);
+  assert.equal((await noAcepta.json()).error, "pagos_no_configurados");
+  // el listado de pedidos es solo de administración
+  assert.equal((await fetch(B + "/api/admin/orders")).status, 401);
+  assert.equal((await j("/api/admin/orders")).status, 200);
+});
+
 test("token de agente: degrada con claridad sin API key", async () => {
   const r = await fetch(B + "/api/agents/token");
   // en el entorno de test no hay ELEVENLABS_API_KEY
