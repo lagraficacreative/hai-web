@@ -357,6 +357,8 @@ const HEYGEN_VOICE_ID = process.env.HEYGEN_VOICE_ID || "";
 const HEYGEN_CONTEXT_ID = process.env.HEYGEN_CONTEXT_ID || "";
 const HEYGEN_SANDBOX = process.env.HEYGEN_SANDBOX !== "false";
 let embedCache = null;
+let embedCacheAt = 0;
+const EMBED_TTL = 3600_000;
 
 const MONTSE_PERSONA = `Eres el Human AI de Montse Torrelles, creado con la plataforma HAI (Human AI Experiences) de La Gràfica Creative. Hablas SIEMPRE en español (o en catalán si te hablan en catalán), con un tono natural, cercano, directo y con sentido del humor suave. Respuestas BREVES (2-4 frases), porque se dicen en voz alta.
 
@@ -381,28 +383,49 @@ async function laApi(pathName, opts = {}) {
   return (await res.json()).data;
 }
 
+async function pickPublicAvatar() {
+  const pub = await laApi("/v1/avatars/public?page_size=50");
+  const chosen = (pub.results || []).find((a) => a.status === "ACTIVE" && a.default_voice) || (pub.results || [])[0];
+  if (!chosen) throw new Error("sin avatares disponibles");
+  return chosen;
+}
+
 app.get("/api/avatar-embed", async (req, res) => {
   if (!HEYGEN_KEY) return res.status(503).json({ error: "avatar_no_configurado" });
-  if (embedCache) return res.json(embedCache);
+  if (embedCache && Date.now() - embedCacheAt < EMBED_TTL) return res.json(embedCache);
   if (!rateLimit(clientIp(req), "embed", 10)) return res.status(429).json({ error: "demasiadas_peticiones" });
   try {
-    let avatarId = HEYGEN_AVATAR_ID;
+    // Avatar preferido: el configurado (el de Montse) solo si ya está activo; si no, catálogo público
+    let avatarId = null;
     let voiceId = HEYGEN_VOICE_ID;
-    if (!avatarId) {
-      const avatars = await laApi("/v1/avatars?page_size=50");
-      let chosen = (avatars.results || []).find((a) => a.status === "ACTIVE") || (avatars.results || [])[0];
-      if (!chosen) {
-        // Plan sin avatar propio: usar una presentadora del catálogo público
-        const pub = await laApi("/v1/avatars/public?page_size=50");
-        chosen = (pub.results || []).find((a) => a.status === "ACTIVE") || (pub.results || [])[0];
+    if (HEYGEN_AVATAR_ID) {
+      const mine = await laApi("/v1/avatars?page_size=50").catch(() => ({ results: [] }));
+      const own = (mine.results || []).find((a) => a.id === HEYGEN_AVATAR_ID);
+      if (own && own.status === "ACTIVE") {
+        avatarId = own.id;
+        if (!voiceId && own.default_voice) voiceId = own.default_voice.id;
       }
-      if (!chosen) throw new Error("sin avatares disponibles");
-      avatarId = chosen.id;
-      if (!voiceId && chosen.default_voice) voiceId = chosen.default_voice.id;
+    }
+    if (!avatarId) {
+      const avatars = await laApi("/v1/avatars?page_size=50").catch(() => ({ results: [] }));
+      const own = (avatars.results || []).find((a) => a.status === "ACTIVE");
+      if (own) {
+        avatarId = own.id;
+        if (!voiceId && own.default_voice) voiceId = own.default_voice.id;
+      }
+    }
+    if (!avatarId) {
+      const pub = await pickPublicAvatar();
+      avatarId = pub.id;
+      if (!voiceId && pub.default_voice) voiceId = pub.default_voice.id;
     }
     if (!voiceId) {
       const voices = await laApi("/v1/voices?voice_type=private&page_size=50").catch(() => ({ results: [] }));
       voiceId = ((voices.results || [])[0] || {}).id;
+    }
+    if (!voiceId) {
+      const pub = await pickPublicAvatar();
+      voiceId = (pub.default_voice || {}).id;
     }
     let contextId = HEYGEN_CONTEXT_ID;
     if (!contextId) {
@@ -428,7 +451,8 @@ app.get("/api/avatar-embed", async (req, res) => {
         max_session_duration: 300,
       }),
     });
-    embedCache = { url: embed.url, sandbox: HEYGEN_SANDBOX };
+    embedCache = { url: embed.url, sandbox: HEYGEN_SANDBOX, avatarId };
+    embedCacheAt = Date.now();
     res.json(embedCache);
   } catch (err) {
     console.error("avatar-embed error:", err.message);
