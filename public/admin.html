@@ -44,7 +44,11 @@
   <div><a href="index.html" style="margin-right:16px">Web</a><button id="logoutBtn">Salir</button></div>
 </header>
 <main>
-  <h1 style="font-size:22px">Clientes y recuerdos</h1>
+  <h1 style="font-size:22px">Solicitudes de experiencias</h1>
+  <p class="meta" style="margin-top:4px">Formularios enviados desde las páginas de Business, Events, Museum, Tourism, Education y Home Live.</p>
+  <div id="leadsList" style="margin-top:20px;margin-bottom:40px"><div class="msg">Cargando…</div></div>
+
+  <h1 style="font-size:22px">Clientes y recuerdos (Memories)</h1>
   <p class="meta" style="margin-top:4px">Cada cuenta con sus respuestas del cuestionario y sus archivos. Haz clic en un cliente para ver el detalle.</p>
   <div id="list" style="margin-top:20px"><div class="msg">Cargando…</div></div>
 </main>
@@ -76,6 +80,7 @@
     if (!me.ok) { location.href = "cuenta.html?next=admin.html"; return; }
     const r = await fetch("/api/admin/clients");
     if (r.status === 403) { list.innerHTML = '<div class="msg">Esta zona es solo para administración de HAI.<br/>Has entrado con una cuenta que no tiene permiso.</div>'; return; }
+    renderLeads();
     const { clients } = await r.json();
     if (!clients.length) { list.innerHTML = '<div class="msg">Aún no hay clientes registrados.</div>'; return; }
     list.innerHTML = "";
@@ -122,6 +127,31 @@
       list.appendChild(card);
     });
   }
+  async function renderLeads() {
+    const box = document.getElementById("leadsList");
+    const r = await fetch("/api/admin/leads").catch(() => null);
+    if (!r || !r.ok) { box.innerHTML = '<div class="msg">No se han podido cargar.</div>'; return; }
+    const { leads } = await r.json();
+    if (!leads.length) { box.innerHTML = '<div class="msg">Aún no hay solicitudes.</div>'; return; }
+    const NICE = { business: "Business", events: "Events", museum: "Museum", tourism: "Tourism", education: "Education", homelive: "Home Live" };
+    box.innerHTML = "";
+    leads.forEach((l) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      const rows = Object.entries(l.data || {}).filter(([k, v]) => v && String(v).length && k !== "nombre" && k !== "email")
+        .map(([k, v]) => '<div class="qa"><div class="q">' + k.replace(/_/g, " ") + '</div><div class="a">' +
+          (Array.isArray(v) ? v.join(" · ") : String(v)).replace(/</g, "&lt;") + "</div></div>").join("");
+      card.innerHTML =
+        '<div class="client-row"><div><h3>' + (l.name || "(sin nombre)") +
+        ' · <span style="color:var(--dim);font-weight:400">' + l.email + "</span>" +
+        '<span class="tag ok">HAI ' + (NICE[l.sector] || l.sector) + "</span></h3>" +
+        '<div class="meta">Recibida: ' + l.created_at + ' UTC</div></div><div class="meta">ver detalle ▾</div></div>' +
+        '<div class="detail">' + (rows || "<p class='meta'>Sin detalles.</p>") + "</div>";
+      card.querySelector(".client-row").onclick = () => card.querySelector(".detail").classList.toggle("open");
+      box.appendChild(card);
+    });
+  }
+
   init();
 })();
 </script>

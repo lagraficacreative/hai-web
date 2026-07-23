@@ -74,6 +74,14 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id, id);
+  CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sector TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    data TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
@@ -424,6 +432,30 @@ app.get("/api/files/:id", (req, res) => {
   fs.createReadStream(row.path).on("error", () => res.status(410).end()).pipe(res);
 });
 
+// ── Solicitudes de experiencias (formularios por sector, sin cuenta) ──
+const LEAD_SECTORS = ["business", "events", "museum", "tourism", "education", "homelive"];
+app.post("/api/leads", (req, res) => {
+  if (!rateLimit(clientIp(req), "leads", 10)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  const b = req.body || {};
+  if (!LEAD_SECTORS.includes(b.sector)) return res.status(400).json({ error: "sector_invalido" });
+  const email = String(b.email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: "email_invalido" });
+  const json = JSON.stringify(b.data && typeof b.data === "object" ? b.data : {});
+  if (json.length > 30_000) return res.status(400).json({ error: "respuestas_demasiado_largas" });
+  db.prepare("INSERT INTO leads (sector, name, email, data) VALUES (?, ?, ?, ?)").run(
+    b.sector, String(b.name || "").slice(0, 120), email, json
+  );
+  res.json({ ok: true });
+});
+
+app.get("/api/admin/leads", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (!isAdmin(user)) return res.status(403).json({ error: "solo_administracion" });
+  const rows = db.prepare("SELECT id, sector, name, email, data, created_at FROM leads ORDER BY id DESC LIMIT 200").all();
+  res.json({ leads: rows.map((r) => ({ ...r, data: JSON.parse(r.data) })) });
+});
+
 // ── Panel de administración (solo Montse) ──
 app.get("/api/admin/clients", (req, res) => {
   const user = requireUser(req, res);
@@ -667,7 +699,9 @@ async function ensureXiAgent() {
           language: "es",
           prompt: { prompt: WEB_PERSONA + "\n\n" + GUARDRAILS },
         },
-        ...(XI_VOICE ? { tts: { voice_id: XI_VOICE } } : {}),
+        // Los agentes no ingleses exigen turbo o flash v2_5 (el default
+        // eleven_flash_v2 es solo inglés y ElevenLabs devuelve 400).
+        tts: { model_id: "eleven_flash_v2_5", ...(XI_VOICE ? { voice_id: XI_VOICE } : {}) },
       },
     }),
   });

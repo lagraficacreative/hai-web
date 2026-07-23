@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HAI · Cuéntanos tu proyecto</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#16335F; --surface:#1C3D6C; --surface2:#24487A; --border:#32547F;
+    --text:#F7FAFF; --dim:#A7BCD9; --primary:#7C6AF7; --accent:#22D3EE; --success:#34D399; --danger:#F87171;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;line-height:1.55;min-height:100vh}
+  h1,h2{font-family:"Manrope",sans-serif;letter-spacing:-.01em}
+  a{color:inherit;text-decoration:none}
+  .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .logo{font-family:"Manrope";font-weight:700;font-size:18px}
+  header a.back{color:var(--dim);font-size:13px}
+  main{max-width:720px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:clamp(24px,4vw,32px);font-weight:500;text-align:center}
+  .sub{color:var(--dim);text-align:center;margin-top:10px;font-size:15px}
+  .stepper{display:flex;gap:8px;margin:28px 0 8px}
+  .stepper div{flex:1;height:4px;border-radius:2px;background:var(--surface2)}
+  .stepper div.done{background:linear-gradient(135deg,#7C6AF7,#22D3EE)}
+  .step-label{text-align:center;color:var(--dim);font-size:13px;margin-bottom:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px}
+  .card h2{font-size:18px;font-weight:600}
+  .card .hint{color:var(--dim);font-size:13px;margin-top:4px}
+  label{display:block;font-size:13px;font-weight:600;margin:16px 0 6px}
+  label small{color:var(--dim);font-weight:400}
+  input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 14px;font-size:14px;font-family:inherit}
+  textarea{min-height:90px;resize:vertical}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary)}
+  .checks{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .checks label{display:inline-flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:400;cursor:pointer;margin:0}
+  .checks input{width:auto}
+  .nav-btns{display:flex;justify-content:space-between;margin-top:24px;gap:12px}
+  .btn{border:none;cursor:pointer;font-family:"Manrope";font-weight:600;font-size:15px;border-radius:10px;padding:13px 26px}
+  .btn-primary{background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff}
+  .btn-primary:hover{filter:brightness(1.08)}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .final{margin-top:18px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.4);border-radius:12px;padding:18px;font-size:14px;display:none}
+  .err{color:var(--danger);font-size:13px;margin-top:12px;min-height:18px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span class="grad-text">HAI</span> <span id="sectorName"></span></div>
+  <a class="back" id="backLink" href="index.html">← Volver</a>
+</header>
+
+<main>
+  <h1 id="title">Cuéntanos tu proyecto</h1>
+  <p class="sub" id="subtitle">Tres pasos y dos minutos. Con esto te preparamos una propuesta a medida.</p>
+  <div class="stepper" id="stepper"></div>
+  <div class="step-label" id="stepLabel"></div>
+  <div id="stepBox" class="card"></div>
+  <div class="err" id="err"></div>
+  <div class="final" id="final"></div>
+  <div class="nav-btns">
+    <button class="btn btn-secondary" id="prevBtn">← Atrás</button>
+    <button class="btn btn-primary" id="nextBtn">Continuar →</button>
+  </div>
+</main>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  const CONTACT_STEP = {
+    title: "Sobre ti",
+    fields: [
+      { id: "nombre", label: "Tu nombre", type: "text", req: true, ph: "Nombre y apellidos" },
+      { id: "organizacion", label: "Organización", type: "text", ph: "Empresa, institución o proyecto" },
+      { id: "email", label: "Email", type: "email", req: true, ph: "tu@email.com" },
+      { id: "telefono", label: "Teléfono (opcional)", type: "text", ph: "+34 ..." },
+    ],
+  };
+
+  const FINAL_STEP = {
+    title: "Para terminar",
+    fields: [
+      { id: "formatos", label: "¿Qué formatos te interesan?", type: "checks", options: ["Web", "App móvil", "Quiosco / pantalla táctil", "Ventilador holográfico", "Cabina holográfica", "Pantalla transparente", "Videollamada", "Aún no lo sé"] },
+      { id: "plazo", label: "¿Para cuándo te gustaría tenerlo?", type: "select", options: ["Lo antes posible", "En 1-3 meses", "Este año", "Solo estoy explorando"] },
+      { id: "comentarios", label: "Lo que quieras añadir", type: "textarea", ph: "Cuéntanos lo que creas importante..." },
+    ],
+  };
+
+  const SECTORS = {
+    business: {
+      name: "Business", back: "business.html",
+      subtitle: "Cuéntanos cómo sería el asistente digital de tu empresa.",
+      step: {
+        title: "Tu empresa",
+        fields: [
+          { id: "actividad", label: "¿A qué se dedica tu empresa?", type: "text", req: true, ph: "Sector y actividad" },
+          { id: "tareas", label: "¿Qué debería hacer tu HAI?", type: "checks", options: ["Recibir visitas", "Responder preguntas frecuentes", "Presentar productos o servicios", "Agendar citas", "Derivar a mi equipo", "Atender fuera de horario"] },
+          { id: "donde", label: "¿Dónde atendería?", type: "checks", options: ["En nuestra web", "En recepción", "En una pantalla o quiosco", "Por videollamada"] },
+          { id: "idiomas", label: "Idiomas que necesita", type: "text", ph: "p. ej. español, catalán, inglés" },
+          { id: "imagen", label: "¿Qué imagen te imaginas?", type: "select", options: ["Un personaje digital de marca", "Una persona real de nuestro equipo", "No lo sé todavía"] },
+          { id: "material", label: "¿Qué información tenéis para entrenarlo?", type: "textarea", ph: "Web, catálogos, preguntas frecuentes, documentos internos..." },
+        ],
+      },
+    },
+    events: {
+      name: "Events", back: "events.html",
+      subtitle: "Cuéntanos tu evento y le ponemos presentador.",
+      step: {
+        title: "Tu evento",
+        fields: [
+          { id: "tipo_evento", label: "¿Qué evento es?", type: "text", req: true, ph: "Feria, congreso, presentación, gala..." },
+          { id: "fecha", label: "Fecha aproximada", type: "text", ph: "p. ej. octubre 2026" },
+          { id: "lugar", label: "Lugar", type: "text", ph: "Ciudad / recinto" },
+          { id: "asistentes", label: "Asistentes estimados", type: "select", options: ["Menos de 100", "100-500", "500-2000", "Más de 2000"] },
+          { id: "papel", label: "¿Qué haría el HAI?", type: "checks", options: ["Presentar el evento o la agenda", "Atraer público al stand", "Responder preguntas de los asistentes", "Photocall conversacional", "Presentar un producto"] },
+          { id: "formato_evento", label: "¿Cómo lo imaginas?", type: "checks", options: ["Cabina holográfica", "Ventilador holográfico", "Pantalla grande", "En el escenario"] },
+        ],
+      },
+    },
+    museum: {
+      name: "Museum", back: "museum.html",
+      subtitle: "Cuéntanos tu museo o espacio cultural y a quién quieres dar vida.",
+      step: {
+        title: "Tu espacio",
+        fields: [
+          { id: "institucion", label: "¿Qué espacio es?", type: "text", req: true, ph: "Museo, centro de interpretación, monumento, archivo..." },
+          { id: "personaje", label: "¿Qué personaje daría la bienvenida?", type: "text", ph: "Un personaje histórico, un artista, un cronista del lugar..." },
+          { id: "publicos", label: "¿Qué públicos os visitan?", type: "checks", options: ["Escolares", "Familias", "Turismo nacional", "Turismo internacional", "Especialistas"] },
+          { id: "idiomas_museo", label: "Idiomas necesarios", type: "text", ph: "p. ej. español, catalán, inglés, francés" },
+          { id: "ubicacion", label: "¿Dónde viviría?", type: "checks", options: ["Recepción / entrada", "Una sala concreta", "Vitrina con pantalla transparente", "Quiosco interactivo", "En el móvil del visitante"] },
+          { id: "fondo", label: "¿Qué material documental tenéis?", type: "textarea", ph: "Catálogo de la colección, biografías, archivo histórico..." },
+        ],
+      },
+    },
+    tourism: {
+      name: "Tourism", back: "tourism.html",
+      subtitle: "Cuéntanos tu hotel o destino y le ponemos conserje digital.",
+      step: {
+        title: "Tu hotel o destino",
+        fields: [
+          { id: "tipo_turismo", label: "¿Qué sois?", type: "select", req: true, options: ["Hotel / alojamiento", "Oficina de turismo", "Destino / ayuntamiento", "Experiencia turística", "Otro"] },
+          { id: "volumen", label: "Visitantes o huéspedes al año (aprox.)", type: "text", ph: "p. ej. 20.000" },
+          { id: "idiomas_turismo", label: "Idiomas prioritarios", type: "text", req: true, ph: "p. ej. español, inglés, francés" },
+          { id: "donde_turismo", label: "¿Dónde atendería?", type: "checks", options: ["Recepción", "Web", "App para el viajero", "Oficina de turismo", "Pantallas en el destino"] },
+          { id: "resolver", label: "¿Qué debería resolver?", type: "checks", options: ["Dudas del alojamiento", "Recomendaciones locales", "Información práctica (horarios, transporte)", "Reservas y entradas", "Atención fuera de horario"] },
+          { id: "contenido_local", label: "¿Qué contenido local tenéis?", type: "textarea", ph: "Guías, webs, folletos, recomendaciones del equipo..." },
+        ],
+      },
+    },
+    education: {
+      name: "Education", back: "education.html",
+      subtitle: "Cuéntanos tu centro y qué tutor necesitáis.",
+      step: {
+        title: "Tu centro",
+        fields: [
+          { id: "tipo_centro", label: "¿Qué tipo de centro sois?", type: "select", req: true, options: ["Colegio / instituto", "Universidad", "Academia / formación", "Formación de empresa", "Otro"] },
+          { id: "materias", label: "¿Qué materias o niveles?", type: "text", req: true, ph: "p. ej. matemáticas ESO, inglés B2, onboarding de empleados" },
+          { id: "alumnos", label: "Número de alumnos (aprox.)", type: "text", ph: "p. ej. 400" },
+          { id: "objetivo_edu", label: "¿Para qué lo usaríais?", type: "checks", options: ["Refuerzo y dudas fuera de clase", "Tutoría y acompañamiento", "Práctica conversacional (idiomas)", "Atención a familias", "Formación interna"] },
+          { id: "donde_edu", label: "¿Dónde viviría?", type: "checks", options: ["Web / campus virtual", "App del estudiante", "Pantalla en el aula", "Biblioteca / sala de estudio"] },
+          { id: "temario", label: "¿Qué material tenéis para entrenarlo?", type: "textarea", ph: "Temarios, apuntes, ejercicios, guías docentes..." },
+        ],
+      },
+    },
+    homelive: {
+      name: "Home Live", back: "homelive.html",
+      subtitle: "Cuéntanos quién está en casa y quién está lejos.",
+      step: {
+        title: "Tu casa",
+        fields: [
+          { id: "quien_casa", label: "¿Quién está en casa?", type: "select", req: true, options: ["Una persona mayor que vive sola", "Una pareja mayor", "Una familia", "Otro"] },
+          { id: "quien_remoto", label: "¿Quién se conectaría desde fuera?", type: "text", ph: "p. ej. sus hijos desde Barcelona, su nieta desde Alemania" },
+          { id: "objetivo_home", label: "¿Qué buscáis sobre todo?", type: "checks", options: ["Compañía diaria (modo IA)", "Videollamadas presenciales (modo humano)", "Recordatorios de medicación", "Seguridad y tranquilidad para la familia", "Ambas cosas: IA + humano"] },
+          { id: "dispositivo", label: "¿Qué dispositivo imagináis?", type: "select", options: ["Ventilador holográfico", "Cabina", "Pantalla", "No lo sé, aconsejadme"] },
+          { id: "wifi", label: "¿Hay wifi en casa?", type: "select", options: ["Sí", "No", "No lo sé"] },
+          { id: "contexto_home", label: "Cuéntanos la situación", type: "textarea", ph: "Cómo es el día a día, qué os preocupa, qué os haría ilusión..." },
+        ],
+      },
+    },
+  };
+
+  const params = new URLSearchParams(location.search);
+  const sectorKey = params.get("sector");
+  const sector = SECTORS[sectorKey];
+  if (!sector) { location.href = "index.html#experiencias"; return; }
+
+  $("sectorName").textContent = sector.name;
+  $("backLink").href = sector.back;
+  $("subtitle").textContent = sector.subtitle;
+  document.title = "HAI " + sector.name + " · Cuéntanos tu proyecto";
+
+  const STEPS = [CONTACT_STEP, sector.step, FINAL_STEP];
+  let current = 0;
+  const data = {};
+
+  STEPS.forEach(() => { const d = document.createElement("div"); $("stepper").appendChild(d); });
+
+  function fieldHtml(f) {
+    const req = f.req ? " *" : "";
+    if (f.type === "textarea") return `<label>${f.label}${req}</label><textarea id="fld_${f.id}" placeholder="${f.ph || ""}"></textarea>`;
+    if (f.type === "select") return `<label>${f.label}${req}</label><select id="fld_${f.id}"><option value="">Elige...</option>${f.options.map((o) => `<option>${o}</option>`).join("")}</select>`;
+    if (f.type === "checks") return `<label>${f.label}${req}</label><div class="checks" id="fld_${f.id}">${f.options.map((o, i) => `<label><input type="checkbox" value="${o}" /> ${o}</label>`).join("")}</div>`;
+    return `<label>${f.label}${req}</label><input type="${f.type}" id="fld_${f.id}" placeholder="${f.ph || ""}" />`;
+  }
+
+  function render() {
+    const step = STEPS[current];
+    $("stepBox").innerHTML = `<h2>${step.title}</h2>` + step.fields.map(fieldHtml).join("");
+    $("stepLabel").textContent = (current + 1) + " de " + STEPS.length + " · " + step.title;
+    [...$("stepper").children].forEach((d, i) => d.classList.toggle("done", i <= current));
+    $("prevBtn").style.visibility = current === 0 ? "hidden" : "visible";
+    $("nextBtn").textContent = current === STEPS.length - 1 ? "Enviar solicitud ✨" : "Continuar →";
+    restore();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function save() {
+    STEPS[current].fields.forEach((f) => {
+      const el = document.getElementById("fld_" + f.id);
+      if (!el) return;
+      if (f.type === "checks") data[f.id] = [...el.querySelectorAll("input:checked")].map((c) => c.value);
+      else data[f.id] = el.value;
+    });
+  }
+  function restore() {
+    STEPS[current].fields.forEach((f) => {
+      const el = document.getElementById("fld_" + f.id);
+      if (!el || data[f.id] === undefined) return;
+      if (f.type === "checks") el.querySelectorAll("input").forEach((c) => { c.checked = (data[f.id] || []).includes(c.value); });
+      else el.value = data[f.id];
+    });
+  }
+  function validate() {
+    for (const f of STEPS[current].fields) {
+      if (!f.req) continue;
+      const v = data[f.id];
+      if (!v || (Array.isArray(v) && !v.length)) return f.label.replace(" *", "");
+    }
+    if (current === 0 && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email || "")) return "un email válido";
+    return null;
+  }
+
+  $("prevBtn").onclick = () => { save(); if (current > 0) { current--; render(); } };
+  $("nextBtn").onclick = async () => {
+    save();
+    const missing = validate();
+    if (missing) { $("err").textContent = "Falta: " + missing; return; }
+    $("err").textContent = "";
+    if (current < STEPS.length - 1) { current++; render(); return; }
+    $("nextBtn").disabled = true;
+    try {
+      const r = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sector: sectorKey, name: data.nombre || "", email: data.email || "", data }),
+      });
+      if (!r.ok) throw new Error("error");
+      $("final").style.display = "block";
+      $("final").innerHTML = "<strong>✓ ¡Recibido!</strong> Gracias, " + (data.nombre || "").split(" ")[0] +
+        ". Ya tenemos tu solicitud de HAI " + sector.name + " — te contactaremos en 24-48 h con una propuesta pensada para tu caso.";
+      $("stepBox").style.display = "none";
+      $("nextBtn").style.display = "none";
+      $("prevBtn").style.display = "none";
+    } catch (e) {
+      $("nextBtn").disabled = false;
+      $("err").textContent = "No se ha podido enviar. Prueba de nuevo o escríbenos a lagraficacreative@gmail.com";
+    }
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
