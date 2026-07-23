@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HAI Business · Recepcionistas y asistentes digitales</title>
+<meta name="description" content="Recepcionistas y asistentes digitales para tu empresa, 24/7. Una experiencia HAI — Human AI Experiences." />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#0A0A0F; --surface:#12121A; --surface2:#1A1A26; --border:#26263A;
+    --text:#F4F4F8; --dim:#9A9AB0; --primary:#7C6AF7; --accent:#22D3EE;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:"Inter",system-ui,sans-serif;line-height:1.55}
+  h1,h2,h3{font-family:"Sora",sans-serif;letter-spacing:-.02em}
+  a{color:inherit;text-decoration:none}
+  .container{max-width:1000px;margin:0 auto;padding:0 24px}
+  .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .btn{display:inline-block;border:none;cursor:pointer;font-family:"Inter";font-weight:600;font-size:15px;border-radius:10px;padding:13px 26px;transition:all .15s}
+  .btn-primary{background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff;box-shadow:0 0 24px rgba(124,106,247,.35)}
+  .btn-primary:hover{filter:brightness(1.08)}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  nav{position:sticky;top:0;z-index:50;background:rgba(10,10,15,.82);backdrop-filter:blur(16px);border-bottom:1px solid rgba(38,38,58,.6)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{font-family:"Sora";font-weight:700;font-size:20px}
+  .hero{position:relative;padding:80px 0 56px;overflow:hidden;text-align:center}
+  .hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 60% 45% at 50% 0%,rgba(124,106,247,.16),transparent 70%)}
+  .hero h1{position:relative;font-size:clamp(32px,5vw,48px)}
+  .hero .claim{position:relative;font-family:"Sora";font-size:clamp(17px,2.5vw,22px);margin-top:14px}
+  .hero .intro{position:relative;color:var(--dim);max-width:640px;margin:20px auto 0;font-size:16px}
+  section{padding:56px 0}
+  h2{font-size:clamp(24px,3.4vw,32px);text-align:center}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:36px}
+  @media (max-width:860px){.grid{grid-template-columns:1fr 1fr}}
+  @media (max-width:560px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px}
+  .card h3{font-size:15px}
+  .card p{color:var(--dim);font-size:13px;margin-top:8px}
+  .pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:32px}
+  .pill{background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:10px 18px;font-size:14px}
+  .cta{text-align:center;padding:72px 0}
+  .cta p{color:var(--dim);max-width:520px;margin:14px auto 0}
+  footer{border-top:1px solid var(--border);padding:28px 0;color:var(--dim);font-size:13px}
+  .foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+</style>
+</head>
+<body>
+<nav>
+  <div class="container nav-inner">
+    <a href="index.html" class="logo"><span class="grad-text">HAI</span> Business</a>
+    <div style="display:flex;gap:18px;align-items:center">
+      <a href="index.html#experiencias" style="color:var(--dim);font-size:14px">← Todas las experiencias</a>
+      <a class="btn btn-primary" style="padding:9px 18px;font-size:13px" href="avatar.html">Habla con HAI</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-bg"></div>
+  <div class="container">
+    <h1>HAI <span class="grad-text">Business</span></h1>
+    <p class="claim">Recepcionistas y asistentes digitales para tu empresa, 24/7.</p>
+    <p class="intro">La primera cara de tu empresa ya no tiene horarios. Un HAI recibe a tus visitas, presenta tus servicios, resuelve las dudas de tus clientes y deriva a tu equipo cuando hace falta — con la imagen y el tono de tu marca.</p>
+    <p style="position:relative;margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <a class="btn btn-primary" href="mailto:lagraficacreative@gmail.com?subject=Quiero%20un%20HAI%20Business">Pide una demo</a>
+      <a class="btn btn-secondary" href="avatar.html">Habla con HAI</a>
+    </p>
+  </div>
+</header>
+
+<section>
+  <div class="container">
+    <h2>Qué hace tu HAI <span class="grad-text">Business</span></h2>
+    <div class="grid">
+      <div class="card"><h3>Recibe y orienta</h3><p>Da la bienvenida en tu recepción o en tu web, presenta la empresa y acompaña a cada visitante hasta lo que busca.</p></div>
+      <div class="card"><h3>Responde como tu equipo</h3><p>Entrenado con tus servicios, documentos y preguntas frecuentes. Solo responde con lo que sabe de tu empresa.</p></div>
+      <div class="card"><h3>Atiende 24/7</h3><p>Fuera de horario, festivos y picos de demanda: tu HAI nunca cierra ni pierde la paciencia.</p></div>
+      <div class="card"><h3>Habla idiomas</h3><p>Atiende a clientes internacionales en su lengua, con la misma naturalidad.</p></div>
+      <div class="card"><h3>Deriva cuando toca</h3><p>Recoge el contacto, agenda la visita o pasa la conversación a una persona de tu equipo en el momento adecuado.</p></div>
+      <div class="card"><h3>Con tu imagen</h3><p>Un rostro corporativo creado digitalmente, o el empleado digital de una persona real de tu equipo.</p></div>
+    </div>
+  </div>
+</section>
+
+<section style="background:linear-gradient(180deg,transparent,rgba(124,106,247,.05),transparent)">
+  <div class="container">
+    <h2>Dónde puede vivir</h2>
+    <div class="pills">
+      <span class="pill">🖥️ Quiosco en recepción</span>
+      <span class="pill">🌐 Tu página web</span>
+      <span class="pill">📹 Videollamada</span>
+      <span class="pill">🪟 Pantalla en oficina</span>
+    </div>
+    <p style="text-align:center;color:var(--dim);font-size:13px;margin-top:20px">La inteligencia vive en la nube: el mismo HAI puede aparecer en varios formatos a la vez. <a href="index.html#formatos" style="color:var(--accent)">Ver todos los formatos →</a></p>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="container">
+    <h2>Imagínalo en tu empresa</h2>
+    <p>Cuéntanos tu caso y te preparamos una propuesta con el formato, la identidad y el presupuesto que encajan.</p>
+    <p style="margin-top:28px"><a class="btn btn-primary" href="mailto:lagraficacreative@gmail.com?subject=Quiero%20un%20HAI%20Business">Escríbenos</a></p>
+  </div>
+</section>
+
+<footer>
+  <div class="container foot">
+    <span>© 2026 HAI — Human AI Experiences · La Gràfica Creative</span>
+    <span><a href="index.html">Inicio</a></span>
+  </div>
+</footer>
+</body>
+</html>

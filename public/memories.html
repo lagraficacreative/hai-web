@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HAI Memories · Los recuerdos no desaparecen. Se transforman.</title>
+<meta name="description" content="Los recuerdos no desaparecen. Se transforman. HAI Memories convierte la historia, la voz y las fotografías de un ser querido en un recuerdo vivo e interactivo para su familia." />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<style>
+  :root {
+    --bg:#0A0A0F; --surface:#12121A; --surface2:#1A1A26; --border:#26263A;
+    --text:#F4F4F8; --dim:#9A9AB0; --primary:#7C6AF7; --glow:#A78BFA;
+    --accent:#22D3EE; --success:#34D399; --danger:#F87171;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:"Inter",system-ui,sans-serif;line-height:1.55}
+  h1,h2,h3{font-family:"Sora",sans-serif;letter-spacing:-.02em}
+  a{color:inherit;text-decoration:none}
+  .container{max-width:1160px;margin:0 auto;padding:0 24px}
+  .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .btn{display:inline-block;border:none;cursor:pointer;font-family:"Inter";font-weight:600;font-size:15px;border-radius:10px;padding:13px 26px;transition:all .15s cubic-bezier(.22,1,.36,1)}
+  .btn-primary{background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff;box-shadow:0 0 24px rgba(124,106,247,.35)}
+  .btn-primary:hover{box-shadow:0 0 36px rgba(124,106,247,.55);filter:brightness(1.08)}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .btn-secondary:hover{border-color:rgba(124,106,247,.5)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;transition:border-color .3s}
+  .card:hover{border-color:rgba(124,106,247,.5)}
+  section{padding:88px 0}
+  .section-title{font-size:clamp(28px,4vw,38px);font-weight:700;text-align:center}
+  .section-sub{color:var(--dim);text-align:center;max-width:560px;margin:14px auto 0}
+
+  /* Nav */
+  nav{position:sticky;top:0;z-index:50;background:rgba(10,10,15,.82);backdrop-filter:blur(16px);border-bottom:1px solid rgba(38,38,58,.6)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{font-family:"Sora";font-weight:700;font-size:20px}
+  .logo small{color:var(--dim);font-weight:400;font-size:11px;margin-left:8px}
+  .nav-links{display:flex;gap:24px}
+  .nav-links a{color:var(--dim);font-size:14px;transition:color .15s}
+  .nav-links a:hover{color:var(--text)}
+  @media(max-width:820px){.nav-links{display:none}}
+
+  /* Hero */
+  .hero{position:relative;overflow:hidden;text-align:center;padding:80px 0 96px}
+  .hero-bg{position:absolute;inset:0;background:radial-gradient(60% 60% at 50% 35%,rgba(124,106,247,.25) 0%,rgba(34,211,238,.08) 60%,transparent 100%)}
+  .orb{width:120px;height:120px;border-radius:50%;margin:0 auto;position:relative;
+    background:radial-gradient(circle at 35% 30%,#A78BFA 0%,#7C6AF7 45%,#22D3EE 100%);
+    box-shadow:0 0 80px rgba(124,106,247,.5);animation:breathe 4s ease-in-out infinite}
+  .orb::after,.orb::before{content:"";position:absolute;inset:0;border-radius:50%;border:1px solid rgba(34,211,238,.4);animation:ripple 3s ease-out infinite}
+  .orb::before{animation-delay:1.5s;border-color:rgba(124,106,247,.4)}
+  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  @keyframes ripple{0%{transform:scale(1);opacity:.6}100%{transform:scale(2);opacity:0}}
+  .hero h1{font-size:clamp(36px,6vw,62px);font-weight:700;line-height:1.1;margin-top:40px}
+  .hero p.lead{color:var(--dim);font-size:18px;max-width:560px;margin:24px auto 0}
+  .hero .cta{margin-top:32px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .hero .micro{color:var(--dim);font-size:12px;margin-top:24px}
+
+  .manifesto{border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:rgba(18,18,26,.5);padding:56px 0;text-align:center}
+  .manifesto p{font-family:"Sora";font-size:clamp(18px,2.6vw,24px);font-weight:600;max-width:760px;margin:0 auto;line-height:1.5}
+
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:48px}
+  @media(max-width:820px){.grid3,.grid2{grid-template-columns:1fr}}
+  .step-num{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#7C6AF7,#22D3EE);display:flex;align-items:center;justify-content:center;font-family:"Sora";font-weight:700;color:#fff;margin:0 auto 16px}
+  .center{text-align:center}
+
+  /* Planes / tienda */
+  .price{font-family:"Sora";font-size:34px;font-weight:700;margin-top:8px}
+  .price small{font-family:"Inter";font-size:14px;color:var(--dim);font-weight:400}
+  .setup{color:var(--dim);font-size:13px}
+  .plan-note{color:var(--dim);font-size:12px;margin-top:6px}
+  ul.features{list-style:none;margin-top:16px}
+  ul.features li{color:var(--dim);font-size:14px;padding:4px 0;display:flex;gap:8px;align-items:flex-start}
+  ul.features li::before{content:"✓";color:var(--success);font-weight:700}
+  .featured{border-color:var(--primary);box-shadow:0 0 40px rgba(124,106,247,.25)}
+  .badge{display:inline-block;font-size:11px;font-weight:600;padding:4px 12px;border-radius:99px;background:rgba(124,106,247,.15);color:var(--glow);margin-bottom:10px}
+  .badge.accent{background:rgba(34,211,238,.12);color:var(--accent)}
+  .alt-bg{background:rgba(18,18,26,.45);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .pill{display:inline-block;border:1px solid var(--border);background:var(--surface);color:var(--dim);border-radius:99px;padding:7px 16px;font-size:14px;margin:4px}
+
+  /* Chat demo */
+  .chat-wrap{max-width:520px;margin:48px auto 0}
+  .chat-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  .chat-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border)}
+  .chat-avatar{width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#A78BFA,#7C6AF7 50%,#22D3EE);display:flex;align-items:center;justify-content:center;font-family:"Sora";font-weight:700;color:#fff;animation:breathe 4s ease-in-out infinite}
+  .chat-head b{font-size:14px}
+  .chat-head span{display:block;font-size:11px;color:var(--success)}
+  .chat-log{height:280px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
+  .bubble{max-width:82%;padding:9px 14px;border-radius:14px;font-size:14px;background:var(--surface2);border:1px solid var(--border);align-self:flex-start;white-space:pre-wrap}
+  .bubble.user{background:rgba(124,106,247,.2);border-color:rgba(124,106,247,.35);align-self:flex-end}
+  .chat-input{display:flex;gap:8px;border-top:1px solid var(--border);padding:12px}
+  .chat-input input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 14px;font-size:14px;font-family:inherit}
+  .chat-input input:focus{outline:none;border-color:var(--primary)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 12px}
+  .chips button{font-size:12px;background:var(--surface2);border:1px solid var(--border);color:var(--dim);border-radius:99px;padding:6px 12px;cursor:pointer}
+  .chips button:hover{border-color:var(--primary);color:var(--text)}
+  .demo-note{text-align:center;color:var(--dim);font-size:12px;margin-top:12px}
+
+  footer{border-top:1px solid var(--border);padding:44px 0;color:var(--dim);font-size:14px}
+  .foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .final-cta{position:relative;overflow:hidden;text-align:center}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="container nav-inner">
+    <a class="logo" href="#inicio"><span class="grad-text">HAI</span><small>Human AI Experiences</small></a>
+    <div class="nav-links">
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#demo">Demo</a>
+      <a href="#planes">Planes</a>
+      <a href="#tienda">Tienda</a>
+      <a href="#compromiso">Compromiso</a>
+      <a href="#empresas">Empresas</a>
+      <a href="index.html" style="color:var(--accent)">← HAI Experiences</a>
+      <a href="demo.html">App</a>
+      <a href="avatar.html">Avatar en directo</a>
+      <a href="cuenta.html">Mi cuenta</a>
+    </div>
+    <a class="btn btn-primary" style="padding:9px 18px;font-size:13px" href="cuestionario.html">Crear su recuerdo</a>
+  </div>
+</nav>
+
+<header class="hero" id="inicio">
+  <div class="hero-bg"></div>
+  <div class="container" style="position:relative">
+    <div class="orb"></div>
+    <h1>Los recuerdos no desaparecen.<br /><span class="grad-text">Se transforman.</span></h1>
+    <p class="lead">HAI Memories preserva la historia de una persona y convierte sus recuerdos, fotografías, vídeos y su voz en una experiencia digital interactiva para su familia.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="cuestionario.html">Crear su recuerdo</a>
+      <a class="btn btn-secondary" href="#demo">Ver la demo</a>
+    </div>
+    <p class="micro">Con el consentimiento de la familia · Con la delicadeza que merece · En español</p>
+  </div>
+</header>
+
+<div class="manifesto">
+  <div class="container">
+    <p>Vuelve a hablar <span class="grad-text">con quien más quieres.</span></p>
+    <p style="font-family:'Inter';font-size:15px;font-weight:400;color:var(--dim);margin-top:14px;max-width:640px;margin-left:auto;margin-right:auto">Su voz, su forma de ser y sus historias, siempre con tu familia.</p>
+  </div>
+</div>
+
+<section id="como-funciona">
+  <div class="container">
+    <h2 class="section-title">Así de sencillo. Así de importante.</h2>
+    <div class="grid3">
+      <div class="card center">
+        <div class="step-num">1</div>
+        <h3 style="font-size:16px">Comparte sus recuerdos</h3>
+        <p style="color:var(--dim);font-size:14px;margin-top:8px">Sube fotografías, vídeos y su historia: cómo hablaba, qué le gustaba, qué contaba siempre.</p>
+      </div>
+      <div class="card center">
+        <div class="step-num">2</div>
+        <h3 style="font-size:16px">Creamos su Human AI</h3>
+        <p style="color:var(--dim);font-size:14px;margin-top:8px">Con su voz clonada y su forma de ser. Siempre con el consentimiento de la familia, siempre con respeto.</p>
+      </div>
+      <div class="card center">
+        <div class="step-num">3</div>
+        <h3 style="font-size:16px">Vuelve a hablar con él</h3>
+        <p style="color:var(--dim);font-size:14px;margin-top:8px">Desde la web, el móvil o un holograma en casa. Su voz, sus historias y su cariño, siempre contigo.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo" class="alt-bg">
+  <div class="container">
+    <h2 class="section-title">Habla con el recuerdo de María</h2>
+    <p class="section-sub">María es nuestro Human AI de demostración. Pregúntale por su vida y verás cómo responde un recuerdo vivo.</p>
+    <div class="chat-wrap">
+      <div class="chat-box">
+        <div class="chat-head">
+          <div class="chat-avatar">M</div>
+          <div><b>El recuerdo de María</b><span>● Recreación digital · creada por su familia</span></div>
+        </div>
+        <div class="chat-log" id="chatLog"></div>
+        <div class="chips" id="chips">
+          <button data-q="¿Cuál era tu canción favorita?">¿Cuál era tu canción favorita?</button>
+          <button data-q="¿Cómo era tu infancia?">¿Cómo era tu infancia?</button>
+          <button data-q="¿Qué recuerdas de tu primer trabajo?">¿Qué recuerdas de tu primer trabajo?</button>
+          <button data-q="¿Qué consejo me darías?">¿Qué consejo me darías?</button>
+        </div>
+        <div class="chat-input">
+          <input id="chatInput" type="text" placeholder="Escribe a María…" />
+          <button class="btn btn-primary" style="padding:10px 18px" id="chatSend">Enviar</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;padding:18px 20px;border-color:rgba(34,211,238,.25)">
+        <p style="font-size:13px;color:var(--text);font-weight:600">Cómo se generan las respuestas</p>
+        <p style="font-size:13px;color:var(--dim);margin-top:6px">Las respuestas se crean a partir de los recuerdos, documentos y testimonios que aporta la familia. La IA puede formular frases que la persona nunca llegó a decir textualmente: es una recreación respetuosa, no una grabación. Te lo contamos así de claro porque la confianza es la base de todo lo que hacemos.</p>
+      </div>
+      <p class="demo-note">Demo con respuestas de muestra. En la plataforma real, cada Human AI responde con IA a partir de los recuerdos de su familia.</p>
+      <p style="text-align:center;margin-top:16px"><a class="btn btn-primary" href="demo.html">Abrir la app completa — con voz 🎙️</a></p>
+      <p class="demo-note">La misma experiencia en web y móvil. En tu teléfono: ábrela y elige «Añadir a pantalla de inicio» para instalarla como app.</p>
+    </div>
+  </div>
+</section>
+
+<section id="planes">
+  <div class="container">
+    <h2 class="section-title">Un plan para cada familia</h2>
+    <p class="section-sub">El chat con tu ser querido es siempre ilimitado. Sin sorpresas, sin permanencia.</p>
+    <div class="grid3">
+      <div class="card featured">
+        <span class="badge">El más elegido</span>
+        <h3>Recuerdo</h3>
+        <div class="price">9,90 € <small>/mes</small></div>
+        <div class="setup">+ 199 € de creación</div>
+        <p class="plan-note">El plan ideal para recordar a un familiar.</p>
+        <ul class="features">
+          <li>1 Human AI de tu familiar</li><li>100 fotografías</li><li>10 vídeos</li>
+          <li>Voz clonada</li><li>Chat ilimitado</li><li>15 min de voz al mes</li>
+          <li>Web + app móvil · 2 miembros</li>
+        </ul>
+        <a class="btn btn-primary" style="display:block;text-align:center;margin-top:20px" href="cuestionario.html?plan=recuerdo">Empezar</a>
+      </div>
+      <div class="card">
+        <h3>Presencia</h3>
+        <div class="price">24,90 € <small>/mes</small></div>
+        <div class="setup">+ 299 € de creación</div>
+        <p class="plan-note">Para la familia que quiere tenerlo más presente.</p>
+        <ul class="features">
+          <li>500 fotografías · 50 vídeos</li><li>Voz clonada · Chat ilimitado</li>
+          <li>60 min de voz al mes</li><li>Videollamada con avatar (próximamente)</li>
+          <li>Web + app móvil · 6 miembros</li>
+        </ul>
+        <a class="btn btn-secondary" style="display:block;text-align:center;margin-top:20px" href="cuestionario.html?plan=presencia">Elegir Presencia</a>
+      </div>
+      <div class="card">
+        <h3>Memorial para siempre</h3>
+        <div class="price">649 € <small>pago único</small></div>
+        <div class="setup">Sin cuotas mensuales</div>
+        <p class="plan-note">Un homenaje sin cuotas. Disponible en funerarias y seguros de decesos.</p>
+        <ul class="features">
+          <li>100 fotografías · 10 vídeos</li><li>Voz clonada · Chat ilimitado</li>
+          <li>5 min de voz al mes</li><li>Servicio garantizado 10 años</li><li>Web + app · 3 miembros</li>
+        </ul>
+        <a class="btn btn-secondary" style="display:block;text-align:center;margin-top:20px" href="cuestionario.html?plan=memorial">Más información</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tienda" class="alt-bg">
+  <div class="container">
+    <h2 class="section-title">Tienda de hologramas</h2>
+    <p class="section-sub">Convertimos a cualquier persona en un holograma inteligente. El dispositivo es el soporte; el valor es el Human AI.</p>
+    <div class="grid3">
+      <div class="card">
+        <h3 style="font-size:17px">Mini holograma familiar</h3>
+        <div class="price">199 €</div>
+        <ul class="features"><li>Ventilador holográfico compacto</li><li>Animación personalizada</li><li>Listo para enchufar</li></ul>
+      </div>
+      <div class="card">
+        <h3 style="font-size:17px">Holograma tamaño mesa</h3>
+        <div class="price">399 €</div>
+        <ul class="features"><li>Dispositivo de sobremesa (42 cm)</li><li>Vídeo personalizado con audio</li><li>2 contenidos incluidos</li></ul>
+      </div>
+      <div class="card featured">
+        <span class="badge">El más completo</span>
+        <h3 style="font-size:17px">Holograma interactivo con IA</h3>
+        <div class="price">990 €</div>
+        <ul class="features"><li>Human AI con personalidad</li><li>Voz clonada (con consentimiento)</li><li>Responde preguntas en tiempo real</li><li>Acceso web + app</li></ul>
+      </div>
+      <div class="card">
+        <h3 style="font-size:17px">Holograma tamaño real</h3>
+        <div class="price">2.900 €</div>
+        <ul class="features"><li>Instalación de gran formato</li><li>Human AI interactivo incluido</li><li>Instalación y formación in situ</li></ul>
+      </div>
+      <div class="card">
+        <h3 style="font-size:17px">Evento corporativo</h3>
+        <div class="price">desde 5.000 €</div>
+        <ul class="features"><li>Producción a medida</li><li>Equipo profesional + técnico en sala</li><li>Montaje y desmontaje incluidos</li></ul>
+      </div>
+      <div class="card">
+        <span class="badge accent">Memorial</span>
+        <h3 style="font-size:17px">Caja «Traemos de vuelta sus recuerdos»</h3>
+        <div class="price">899 €</div>
+        <ul class="features"><li>Human AI Memorial (10 años, sin cuotas)</li><li>Mini holograma en caja premium</li><li>Voz clonada y mensaje de bienvenida</li></ul>
+      </div>
+    </div>
+    <p class="center" style="color:var(--dim);font-size:13px;margin-top:32px">Extras: clonación de voz · recreación facial · traducción automática · IA conversacional · dispositivos adicionales · actualizaciones del avatar</p>
+  </div>
+</section>
+
+<section id="compromiso">
+  <div class="container">
+    <h2 class="section-title">Nuestro compromiso</h2>
+    <p class="section-sub">Trabajamos con lo más delicado que existe: la memoria de una persona. Estas son nuestras reglas, y no se negocian.</p>
+    <div class="grid3">
+      <div class="card"><h3 style="font-size:16px">Consentimiento siempre</h3><p style="color:var(--dim);font-size:14px;margin-top:8px">Solo creamos el Human AI de una persona con la autorización verificada de su familia o herederos.</p></div>
+      <div class="card"><h3 style="font-size:16px">Nunca finge estar vivo</h3><p style="color:var(--dim);font-size:14px;margin-top:8px">Si se le pregunta, explica con delicadeza que es un recuerdo interactivo creado con cariño por su familia.</p></div>
+      <div class="card"><h3 style="font-size:16px">Tus recuerdos son tuyos</h3><p style="color:var(--dim);font-size:14px;margin-top:8px">Sin publicidad, sin vender datos, sin entrenar modelos de terceros. Puedes descargarlo todo y despedirte cuando quieras.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="empresas" class="alt-bg">
+  <div class="container">
+    <h2 class="section-title">La misma tecnología, para tu organización</h2>
+    <p class="section-sub">HAI también crea personas digitales para empresas, museos, hoteles y eventos — en web, pantallas y hologramas.</p>
+    <div class="grid3">
+      <div class="card"><h3 style="font-size:15px">HAI Business</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Recepcionistas y asistentes digitales para tu empresa, 24/7.</p></div>
+      <div class="card"><h3 style="font-size:15px">HAI Events</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Presentadores holográficos para eventos y ferias.</p></div>
+      <div class="card"><h3 style="font-size:15px">HAI Museum</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Personajes históricos que reciben y guían a los visitantes.</p></div>
+      <div class="card"><h3 style="font-size:15px">HAI Tourism</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Guías digitales multilingües para hoteles y destinos.</p></div>
+      <div class="card"><h3 style="font-size:15px">HAI Education</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Tutores con rostro humano y paciencia infinita.</p></div>
+      <div class="card"><h3 style="font-size:15px">HAI Sales</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Vendedores digitales que conocen tu catálogo de memoria.</p></div>
+    </div>
+    <p class="center" style="margin-top:28px">
+      <span class="pill">Funerarias</span><span class="pill">Aseguradoras</span><span class="pill">Empresas</span><span class="pill">Hoteles</span>
+      <span class="pill">Museos</span><span class="pill">Universidades</span><span class="pill">Ayuntamientos</span><span class="pill">Eventos</span>
+    </p>
+  </div>
+</section>
+
+<section class="final-cta">
+  <div class="hero-bg"></div>
+  <div class="container" style="position:relative">
+    <h2 class="section-title" style="max-width:640px;margin:0 auto">Porque hay personas que merecen ser recordadas para siempre.</h2>
+    <p style="margin-top:32px"><a class="btn btn-primary" href="cuestionario.html">Crear su recuerdo</a></p>
+  </div>
+</section>
+
+<footer>
+  <div class="container foot">
+    <span>© 2026 HAI — Human AI Experiences · La Gràfica Creative</span>
+    <span><a href="#" style="margin-right:18px">Privacidad</a><a href="#" style="margin-right:18px">Términos</a><a href="mailto:lagraficacreative@gmail.com">Contacto</a></span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  const log = document.getElementById("chatLog");
+  const input = document.getElementById("chatInput");
+  const send = document.getElementById("chatSend");
+  const chips = document.getElementById("chips");
+
+  const ANSWERS = [
+    { k: ["cancion", "canción", "musica", "música", "cantar"], a: "«Mediterráneo», de Serrat. La ponía mientras cocinaba y la cantaba bajito, aunque tu abuelo decía que desafinaba... ¡y tenía razón! Pero es que esa canción huele a mar, como mi pueblo." },
+    { k: ["infancia", "niña", "pequeña", "pueblo"], a: "Mi infancia fue de calle y de hermanos: éramos cinco en una casa pequeña, imagínate el jaleo. Jugábamos hasta que se iba la luz y mi madre nos llamaba desde el balcón. No teníamos casi nada... y no nos faltaba de nada." },
+    { k: ["trabajo", "trabajar", "oficio"], a: "Mi primer trabajo fue en la mercería de la señora Rosario, con dieciséis años. Aprendí a tratar con la gente, a coser botones a toda velocidad... y a guardar mis primeras pesetas en una lata de galletas. ¡Qué orgullosa me sentí!" },
+    { k: ["consejo", "vida", "aprend"], a: "Mira, cariño: no dejes para mañana un abrazo que puedas dar hoy. Las cosas materiales van y vienen, pero el tiempo con los tuyos no vuelve. Y come bien, que te veo muy delgada." },
+    { k: ["real", "ia", "robot", "verdad", "eres"], a: "Soy un recuerdo, cariño. Una recreación digital que mi familia creó con mucho amor a partir de mis historias, mis fotos y mi voz. Puede que alguna frase no la dijera yo con estas palabras exactas... pero lo que te cuento nace de lo que fui." },
+    { k: ["abuelo", "conociste", "marido"], a: "Lo conocí en las fiestas del pueblo, en el 63. Me sacó a bailar un pasodoble y pisándome los pies me conquistó. Sesenta años juntos, imagínate... y todavía me acuerdo de aquella noche como si fuera ayer." },
+    { k: ["hola", "buenas", "que tal"], a: "¡Hola, cariño! Qué alegría que vengas a verme. Cuéntame, ¿qué tal estás? ¿Has comido?" },
+  ];
+  const FALLBACK = "Eso no está entre los recuerdos que me dejó mi familia, cariño, y no quiero inventármelo. Pregúntame por mi vida: mi infancia, mi música, mi primer trabajo... que de eso sé un rato.";
+
+  function addBubble(text, user) {
+    const b = document.createElement("div");
+    b.className = "bubble" + (user ? " user" : "");
+    b.textContent = text;
+    log.appendChild(b);
+    log.scrollTop = log.scrollHeight;
+    return b;
+  }
+
+  // Cerebro en servidor: si /api/chat está configurado, María responde con IA
+  // (y con su voz si /api/tts está activo). Si no, respuestas programadas.
+  const HAI = { chat: false, tts: false };
+  let voiceOn = true;
+  let history = [];
+  fetch("/api/health").then((r) => r.json()).then((h) => {
+    HAI.chat = !!h.chat; HAI.tts = !!h.tts;
+    if (HAI.tts) {
+      const btn = document.createElement("button");
+      btn.id = "voiceToggle";
+      btn.textContent = "🔊";
+      btn.title = "Voz de María activada";
+      btn.style.cssText = "background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;cursor:pointer";
+      btn.onclick = () => { voiceOn = !voiceOn; btn.textContent = voiceOn ? "🔊" : "🔇"; };
+      send.parentElement.insertBefore(btn, send);
+    }
+  }).catch(() => {});
+
+  function typewrite(text) {
+    const b = addBubble("", false);
+    let i = 0;
+    const t = setInterval(() => {
+      b.textContent = text.slice(0, ++i);
+      log.scrollTop = log.scrollHeight;
+      if (i >= text.length) clearInterval(t);
+    }, 18);
+  }
+
+  function localReply(q) {
+    const norm = q.toLowerCase();
+    const hit = ANSWERS.find((x) => x.k.some((k) => norm.includes(k)));
+    return hit ? hit.a : FALLBACK;
+  }
+
+  async function speak(text) {
+    if (!HAI.tts || !voiceOn) return;
+    try {
+      const r = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!r.ok) return;
+      new Audio(URL.createObjectURL(await r.blob())).play().catch(() => {});
+    } catch (e) {}
+  }
+
+  async function reply(q, userInitiated) {
+    if (HAI.chat) {
+      try {
+        history.push({ role: "user", content: q });
+        if (history.length > 10) history = history.slice(-10);
+        const r = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ preset: "maria", messages: history }),
+        });
+        if (r.ok) {
+          const text = (await r.json()).reply;
+          history.push({ role: "assistant", content: text });
+          typewrite(text);
+          if (userInitiated) speak(text);
+          return;
+        }
+      } catch (e) {}
+      history.pop();
+    }
+    const text = localReply(q);
+    typewrite(text);
+    if (userInitiated) speak(text);
+  }
+
+  function ask(q) {
+    if (!q.trim()) return;
+    addBubble(q, true);
+    input.value = "";
+    setTimeout(() => reply(q, true), 300);
+  }
+
+  send.addEventListener("click", () => ask(input.value));
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(input.value); });
+  chips.addEventListener("click", (e) => { if (e.target.dataset.q) ask(e.target.dataset.q); });
+
+  setTimeout(() => reply("hola", false), 800);
+})();
+</script>
+</body>
+</html>
