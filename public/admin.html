@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HAI · Administración</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#0A0A0F; --surface:#12121A; --surface2:#1A1A26; --border:#26263A;
+    --text:#F4F4F8; --dim:#9A9AB0; --primary:#7C6AF7; --accent:#22D3EE; --success:#34D399; --danger:#F87171;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:"Inter",system-ui,sans-serif;line-height:1.55;min-height:100vh}
+  h1,h2,h3{font-family:"Sora",sans-serif;letter-spacing:-.02em}
+  a{color:inherit;text-decoration:none}
+  .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .logo{font-family:"Sora";font-weight:700;font-size:18px}
+  header a,header button{color:var(--dim);font-size:13px;background:none;border:none;font-family:inherit;cursor:pointer}
+  main{max-width:960px;margin:0 auto;padding:24px 20px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+  .client-row{display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;flex-wrap:wrap}
+  .client-row:hover h3{color:var(--accent)}
+  .client-row h3{font-size:15px}
+  .meta{color:var(--dim);font-size:13px}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;margin-left:8px}
+  .tag.ok{background:rgba(52,211,153,.15);color:var(--success)}
+  .tag.pending{background:rgba(154,154,176,.15);color:var(--dim)}
+  .detail{display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:16px}
+  .detail.open{display:block}
+  .qa{margin-bottom:10px}
+  .qa .q{font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .qa .a{font-size:14px;white-space:pre-wrap;margin-top:2px}
+  .files a{color:var(--accent);font-size:13px}
+  .files div{padding:4px 0;border-bottom:1px solid var(--border)}
+  .msg{text-align:center;color:var(--dim);padding:60px 20px}
+  h2{font-size:16px;margin:18px 0 10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span class="grad-text">HAI</span> Administración</div>
+  <div><a href="index.html" style="margin-right:16px">Web</a><button id="logoutBtn">Salir</button></div>
+</header>
+<main>
+  <h1 style="font-size:22px">Clientes y recuerdos</h1>
+  <p class="meta" style="margin-top:4px">Cada cuenta con sus respuestas del cuestionario y sus archivos. Haz clic en un cliente para ver el detalle.</p>
+  <div id="list" style="margin-top:20px"><div class="msg">Cargando…</div></div>
+</main>
+
+<script>
+(function () {
+  const LABELS = {
+    f_nombre:"Nombre completo", f_apodo:"Cómo la llamaba la familia", f_nacimiento:"Fecha de nacimiento",
+    f_lugar:"Lugar de nacimiento", f_modo:"Modalidad", f_solicitante:"Solicitante", f_email:"Email de contacto",
+    f_biografia:"Su historia", f_personas:"Personas importantes", f_lugares:"Lugares y fechas señaladas",
+    f_estudios:"Estudios", f_trabajos:"Trabajos", f_logros:"Logros", f_anecdotas_trabajo:"Anécdotas de trabajo",
+    f_humor:"Seria ↔ Bromista (0-100)", f_carino:"Reservada ↔ Cariñosa (0-100)", f_energia:"Tranquila ↔ Enérgica (0-100)",
+    f_habla:"Cómo hablaba", f_muletillas:"Muletillas y expresiones", f_idiomas:"Idiomas", f_escritura:"Cómo escribía",
+    f_gustos:"Gustos", f_evitar:"Temas a evitar", f_cancion:"Su canción", f_infancia:"Su infancia",
+    f_trabajo:"Historia de trabajo", f_pareja:"Historia de pareja", f_consejo:"Su consejo", f_historia_tipica:"La historia que siempre contaba",
+    f_otros:"Otros recuerdos", f_facebook:"Facebook", f_instagram:"Instagram", f_youtube:"YouTube", f_tiktok:"TikTok",
+    f_linkedin:"LinkedIn", f_otras_redes:"Otras redes", f_enlace_material:"Enlace de material externo", f_firma:"Firmado por",
+  };
+  const list = document.getElementById("list");
+  const fmtSize = (b) => b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.round(b / 1024) + " KB";
+
+  document.getElementById("logoutBtn").onclick = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    location.href = "cuenta.html";
+  };
+
+  async function init() {
+    const me = await fetch("/api/auth/me");
+    if (!me.ok) { location.href = "cuenta.html?next=admin.html"; return; }
+    const r = await fetch("/api/admin/clients");
+    if (r.status === 403) { list.innerHTML = '<div class="msg">Esta zona es solo para administración de HAI.<br/>Has entrado con una cuenta que no tiene permiso.</div>'; return; }
+    const { clients } = await r.json();
+    if (!clients.length) { list.innerHTML = '<div class="msg">Aún no hay clientes registrados.</div>'; return; }
+    list.innerHTML = "";
+    clients.forEach((c) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML =
+        '<div class="client-row">' +
+        "<div><h3>" + (c.name || "(sin nombre)") + " · <span style='color:var(--dim);font-weight:400'>" + c.email + "</span>" +
+        (c.submitted ? '<span class="tag ok">cuestionario enviado</span>' : '<span class="tag pending">pendiente</span>') + "</h3>" +
+        '<div class="meta">Human AI: ' + (c.human_name || "—") + " · Archivos: " + c.files_count + " (" + fmtSize(c.files_bytes || 0) + ")" +
+        (c.intake_updated ? " · Última edición: " + c.intake_updated + " UTC" : "") + "</div></div>" +
+        "<div class='meta'>ver detalle ▾</div></div>" +
+        '<div class="detail"></div>';
+      const detail = card.querySelector(".detail");
+      card.querySelector(".client-row").onclick = async () => {
+        if (detail.classList.contains("open")) { detail.classList.remove("open"); return; }
+        detail.classList.add("open");
+        if (detail.dataset.loaded) return;
+        detail.innerHTML = '<p class="meta">Cargando…</p>';
+        const d = await fetch("/api/admin/clients/" + c.id).then((x) => x.json());
+        let html = "";
+        if (d.files.length) {
+          html += "<h2>📁 Archivos</h2><div class='files'>" + d.files.map((f) =>
+            "<div>" + ({fotos:"📷",videos:"🎬",audios:"🎙️"}[f.kind] || "📄") + " <a href='/api/files/" + f.id + "'>" + f.name + "</a> · " + fmtSize(f.size) + "</div>"
+          ).join("") + "</div>";
+        }
+        if (d.intake && d.intake.data) {
+          html += "<h2>📔 Respuestas del cuestionario</h2>";
+          for (const [key, label] of Object.entries(LABELS)) {
+            const v = d.intake.data[key];
+            if (v === undefined || v === "" || v === null) continue;
+            html += '<div class="qa"><div class="q">' + label + '</div><div class="a">' +
+              String(key === "f_modo" ? (v === "en_vida" ? "En vida" : "Homenaje") : v).replace(/</g, "&lt;") + "</div></div>";
+          }
+        }
+        if (d.human && d.human.bio) {
+          html += "<h2>🤖 Human AI configurado</h2><div class='qa'><div class='q'>" + (d.human.name || "") +
+            (d.human.voice_id ? " · voz " + d.human.voice_id : "") + "</div><div class='a'>" + d.human.bio.replace(/</g, "&lt;") + "</div></div>";
+        }
+        detail.innerHTML = html || "<p class='meta'>Este cliente aún no ha rellenado nada.</p>";
+        detail.dataset.loaded = "1";
+      };
+      list.appendChild(card);
+    });
+  }
+  init();
+})();
+</script>
+</body>
+</html>

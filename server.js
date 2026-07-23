@@ -57,7 +57,31 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id);
+  CREATE TABLE IF NOT EXISTS intake (
+    user_id INTEGER PRIMARY KEY,
+    data TEXT NOT NULL DEFAULT '{}',
+    submitted INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    mime TEXT NOT NULL DEFAULT '',
+    size INTEGER NOT NULL DEFAULT 0,
+    path TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id, id);
 `);
+
+const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "lagraficacreative@gmail.com")
+  .toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
+const USER_QUOTA_BYTES = Number(process.env.USER_QUOTA_MB || 500) * 1024 * 1024;
+function isAdmin(user) { return ADMIN_EMAILS.includes((user.email || "").toLowerCase()); }
 
 // ── Contraseñas (scrypt) y sesiones (cookie httpOnly) ──
 function hashPassword(pw) {
@@ -305,6 +329,134 @@ app.post("/api/human/tts", async (req, res) => {
     console.error("private tts error:", err.message);
     res.status(502).json({ error: "error_voz", detail: err.message });
   }
+});
+
+// ── Intranet: cuestionario guardado y archivos de recuerdos ──
+const multer = require("multer");
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, _file, cb) => {
+      const dir = path.join(UPLOADS_DIR, String(req._uid));
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+      const safe = file.originalname.replace(/[^\w.\-áéíóúñç ]/gi, "_").slice(0, 120);
+      cb(null, Date.now() + "-" + crypto.randomBytes(4).toString("hex") + "-" + safe);
+    },
+  }),
+  limits: { fileSize: 300 * 1024 * 1024 },
+});
+
+app.get("/api/intake", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const row = db.prepare("SELECT data, submitted, updated_at FROM intake WHERE user_id = ?").get(user.id);
+  res.json({
+    data: row ? JSON.parse(row.data) : {},
+    submitted: !!(row && row.submitted),
+    updatedAt: row ? row.updated_at : null,
+  });
+});
+
+app.put("/api/intake", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const body = req.body || {};
+  const json = JSON.stringify(body.data && typeof body.data === "object" ? body.data : {});
+  if (json.length > 200_000) return res.status(400).json({ error: "respuestas_demasiado_largas" });
+  const submitted = body.submitted ? 1 : 0;
+  db.prepare(`
+    INSERT INTO intake (user_id, data, submitted, updated_at) VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id) DO UPDATE SET data=excluded.data,
+      submitted=MAX(intake.submitted, excluded.submitted), updated_at=datetime('now')
+  `).run(user.id, json, submitted);
+  res.json({ ok: true });
+});
+
+function attachUid(req, res, next) {
+  const user = requireUser(req, res);
+  if (!user) return;
+  req._uid = user.id;
+  req._user = user;
+  next();
+}
+
+app.post("/api/files", attachUid, (req, res) => {
+  const used = db.prepare("SELECT COALESCE(SUM(size),0) s FROM files WHERE user_id = ?").get(req._uid).s;
+  if (used >= USER_QUOTA_BYTES) return res.status(413).json({ error: "espacio_agotado" });
+  upload.single("file")(req, res, (err) => {
+    if (err || !req.file) {
+      return res.status(400).json({ error: err && err.code === "LIMIT_FILE_SIZE" ? "archivo_demasiado_grande" : "subida_fallida" });
+    }
+    const kind = ["fotos", "videos", "audios"].includes(req.body.kind) ? req.body.kind : "otros";
+    const info = db.prepare(
+      "INSERT INTO files (user_id, kind, name, mime, size, path) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(req._uid, kind, req.file.originalname.slice(0, 200), req.file.mimetype || "", req.file.size, req.file.path);
+    res.json({ ok: true, file: { id: Number(info.lastInsertRowid), kind, name: req.file.originalname, size: req.file.size } });
+  });
+});
+
+app.get("/api/files", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const rows = db.prepare("SELECT id, kind, name, size, created_at FROM files WHERE user_id = ? ORDER BY id").all(user.id);
+  res.json({ files: rows, quota: USER_QUOTA_BYTES });
+});
+
+app.delete("/api/files/:id", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const row = db.prepare("SELECT * FROM files WHERE id = ? AND user_id = ?").get(Number(req.params.id), user.id);
+  if (!row) return res.status(404).json({ error: "no_encontrado" });
+  try { fs.unlinkSync(row.path); } catch (e) {}
+  db.prepare("DELETE FROM files WHERE id = ?").run(row.id);
+  res.json({ ok: true });
+});
+
+app.get("/api/files/:id", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  const row = db.prepare("SELECT * FROM files WHERE id = ?").get(Number(req.params.id));
+  if (!row || (row.user_id !== user.id && !isAdmin(user))) return res.status(404).json({ error: "no_encontrado" });
+  res.setHeader("content-disposition", 'attachment; filename="' + row.name.replace(/"/g, "") + '"');
+  res.setHeader("content-type", row.mime || "application/octet-stream");
+  fs.createReadStream(row.path).on("error", () => res.status(410).end()).pipe(res);
+});
+
+// ── Panel de administración (solo Montse) ──
+app.get("/api/admin/clients", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (!isAdmin(user)) return res.status(403).json({ error: "solo_administracion" });
+  const rows = db.prepare(`
+    SELECT u.id, u.email, u.name, u.created_at,
+      h.name AS human_name,
+      i.submitted, i.updated_at AS intake_updated,
+      (SELECT COUNT(*) FROM files f WHERE f.user_id = u.id) AS files_count,
+      (SELECT COALESCE(SUM(size),0) FROM files f WHERE f.user_id = u.id) AS files_bytes
+    FROM users u
+    LEFT JOIN humans h ON h.user_id = u.id
+    LEFT JOIN intake i ON i.user_id = u.id
+    ORDER BY u.id DESC
+  `).all();
+  res.json({ clients: rows });
+});
+
+app.get("/api/admin/clients/:id", (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (!isAdmin(user)) return res.status(403).json({ error: "solo_administracion" });
+  const uid = Number(req.params.id);
+  const client = db.prepare("SELECT id, email, name, created_at FROM users WHERE id = ?").get(uid);
+  if (!client) return res.status(404).json({ error: "no_encontrado" });
+  const intake = db.prepare("SELECT data, submitted, updated_at FROM intake WHERE user_id = ?").get(uid);
+  const human = db.prepare("SELECT name, bio, voice_id FROM humans WHERE user_id = ?").get(uid);
+  const files = db.prepare("SELECT id, kind, name, size, created_at FROM files WHERE user_id = ? ORDER BY kind, id").all(uid);
+  res.json({
+    client, human: human || null, files,
+    intake: intake ? { data: JSON.parse(intake.data), submitted: !!intake.submitted, updatedAt: intake.updated_at } : null,
+  });
 });
 
 // ── Chat público de la landing (María) ──

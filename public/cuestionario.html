@@ -97,7 +97,22 @@
     { id: "consentimiento", title: "8 de 8 · Consentimiento y envío" },
   ];
   let current = 0;
-  const data = { fotos: [], videos: [], audios: [] };
+  let data = { fotos: [], videos: [], audios: [] };
+  let me = null, serverFiles = [], saveTimer = null;
+
+  function pushIntake(submitted) {
+    if (!me) return Promise.resolve();
+    return fetch("/api/intake", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data, submitted: !!submitted }),
+    }).catch(() => {});
+  }
+  function scheduleSave() {
+    if (!me) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => pushIntake(false), 900);
+  }
 
   const stepsEl = document.getElementById("steps");
   const stepperEl = document.getElementById("stepper");
@@ -269,6 +284,7 @@
       const el = document.getElementById(id);
       if (el) data[id] = el.checked;
     });
+    scheduleSave();
   }
   function restore() {
     FIELDS.forEach((id) => {
@@ -287,21 +303,62 @@
   }
 
   function bindFiles() {
+    if (me) {
+      const warn = document.querySelector("#steps .warn-note");
+      if (warn) warn.innerHTML = "✓ Conectado: los archivos que elijas <strong>se suben y quedan guardados</strong> en tu espacio de HAI (hasta 300 MB por archivo). El enlace de Drive es opcional, por si tienes más material.";
+    }
     ["fotos","videos","audios"].forEach((kind) => {
       const zone = document.getElementById("zone_" + kind);
       const input = document.getElementById("f_" + kind);
       if (!zone || !input) return;
       zone.onclick = () => input.click();
-      input.onchange = () => {
-        data[kind] = [...input.files].map((f) => ({ nombre: f.name, tamano: Math.round(f.size / 1024) + " KB" }));
-        renderFileList(kind);
+      input.onchange = async () => {
+        if (!me) {
+          data[kind] = [...input.files].map((f) => ({ nombre: f.name, tamano: Math.round(f.size / 1024) + " KB" }));
+          renderFileList(kind);
+          return;
+        }
+        for (const f of [...input.files]) {
+          const list = document.getElementById("list_" + kind);
+          const row = document.createElement("div");
+          row.textContent = "⏳ Subiendo " + f.name + "…";
+          if (list) list.appendChild(row);
+          const fd = new FormData();
+          fd.append("kind", kind);
+          fd.append("file", f);
+          try {
+            const r = await fetch("/api/files", { method: "POST", body: fd });
+            if (!r.ok) throw new Error((await r.json()).error || "error");
+            const { file } = await r.json();
+            serverFiles.push({ id: file.id, kind, name: file.name, size: file.size });
+          } catch (err) {
+            alert("No se ha podido subir " + f.name + (err.message === "archivo_demasiado_grande" ? " (supera los 300 MB)" : err.message === "espacio_agotado" ? " (espacio agotado — escríbenos y lo ampliamos)" : ". Prueba de nuevo."));
+          }
+          renderFileList(kind);
+        }
+        input.value = "";
       };
     });
   }
+  function fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.round(b / 1024) + " KB"; }
+  async function deleteFile(id, kind) {
+    if (!confirm("¿Quitar este archivo?")) return;
+    await fetch("/api/files/" + id, { method: "DELETE" }).catch(() => {});
+    serverFiles = serverFiles.filter((f) => f.id !== id);
+    renderFileList(kind);
+  }
+  window._haiDeleteFile = deleteFile;
   function renderFileList(kind) {
     const list = document.getElementById("list_" + kind);
     if (!list) return;
-    list.innerHTML = (data[kind] || []).map((f) => "<div>✓ " + f.nombre + " · " + f.tamano + "</div>").join("");
+    if (me) {
+      list.innerHTML = serverFiles.filter((f) => f.kind === kind).map((f) =>
+        '<div>✓ ' + f.name + " · " + fmtSize(f.size) +
+        ' <a href="#" onclick="_haiDeleteFile(' + f.id + ",'" + kind + "');return false\" style=\"color:var(--danger);margin-left:8px\">quitar</a></div>"
+      ).join("");
+    } else {
+      list.innerHTML = (data[kind] || []).map((f) => "<div>✓ " + f.nombre + " · " + f.tamano + "</div>").join("");
+    }
   }
 
   prevBtn.onclick = () => { save(); if (current > 0) { current--; render(); } };
@@ -318,8 +375,21 @@
     finish();
   };
 
-  function finish() {
+  async function finish() {
     const fecha = new Date().toLocaleString("es-ES");
+    if (me) {
+      await pushIntake(true);
+      const nFiles = serverFiles.length;
+      const box = document.getElementById("resumen_final");
+      box.style.display = "block";
+      box.innerHTML =
+        '<p class="ok" style="font-weight:600">✓ ¡Cuestionario enviado y guardado en tu espacio de HAI!</p>' +
+        '<p style="margin-top:10px">Tenemos tus respuestas' + (nFiles ? " y tus " + nFiles + " archivos" : "") +
+        ". No hace falta que envíes nada más: en 24-48 h te contactamos para revisar juntos los recuerdos y empezar a crear su Human AI.</p>" +
+        '<p style="margin-top:10px;color:var(--dim)">Puedes volver a esta página cuando quieras para completar o cambiar lo que necesites — todo queda guardado.</p>';
+      nextBtn.style.display = "none";
+      return;
+    }
     const doc = { plataforma: "HAI Memories — Cuestionario de recuerdos", fecha, ...data };
     const json = JSON.stringify(doc, null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -347,7 +417,30 @@
     nextBtn.style.display = "none";
   }
 
-  render();
+  async function init() {
+    try {
+      const r = await fetch("/api/auth/me");
+      if (r.ok) me = (await r.json()).user;
+    } catch (e) {}
+    const banner = document.createElement("div");
+    banner.style.cssText = "max-width:760px;margin:0 auto 18px;padding:12px 18px;border-radius:12px;font-size:14px;border:1px solid var(--border);background:var(--surface)";
+    if (me) {
+      const [intakeRes, filesRes] = await Promise.all([
+        fetch("/api/intake").then((r) => r.json()).catch(() => ({ data: {} })),
+        fetch("/api/files").then((r) => r.json()).catch(() => ({ files: [] })),
+      ]);
+      data = { fotos: [], videos: [], audios: [], ...intakeRes.data };
+      serverFiles = filesRes.files || [];
+      banner.innerHTML = "💾 Conectado como <strong>" + (me.name || me.email) +
+        "</strong> — tus respuestas y archivos se guardan automáticamente. Puedes salir y continuar en otro momento." +
+        (intakeRes.submitted ? " <span style='color:var(--success)'>✓ Ya lo enviaste; puedes actualizarlo.</span>" : "");
+    } else {
+      banner.innerHTML = "💡 <strong><a href='cuenta.html?next=cuestionario.html' style='color:var(--accent);text-decoration:underline'>Crea tu cuenta o entra</a></strong> para que tus respuestas se guarden automáticamente y puedas <strong>subir fotos, vídeos y audios</strong> directamente aquí.";
+    }
+    stepperEl.parentNode.insertBefore(banner, stepperEl);
+    render();
+  }
+  init();
 })();
 </script>
 </body>

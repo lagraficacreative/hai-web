@@ -68,6 +68,9 @@
 (function () {
   let mode = "login";
   const $ = (id) => document.getElementById(id);
+  const ALLOWED_NEXT = ["mi-avatar.html", "cuestionario.html", "admin.html"];
+  const nextParam = new URLSearchParams(location.search).get("next");
+  const dest = ALLOWED_NEXT.includes(nextParam) ? nextParam : "mi-avatar.html";
   function setMode(m) {
     mode = m;
     $("tabLogin").classList.toggle("active", m === "login");
@@ -80,7 +83,7 @@
   $("tabLogin").onclick = () => setMode("login");
   $("tabRegister").onclick = () => setMode("register");
 
-  fetch("/api/auth/me").then((r) => { if (r.ok) location.href = "mi-avatar.html"; });
+  fetch("/api/auth/me").then((r) => { if (r.ok) location.href = dest; });
 
   $("form").onsubmit = async (e) => {
     e.preventDefault();
@@ -93,7 +96,7 @@
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (r.ok) { location.href = "mi-avatar.html"; return; }
+      if (r.ok) { location.href = dest; return; }
       const err = (await r.json()).error || "";
       $("msg").textContent =
         err === "email_ya_registrado" ? "Ese email ya tiene cuenta. Prueba a entrar." :
