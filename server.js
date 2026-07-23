@@ -82,6 +82,28 @@ db.exec(`
     data TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS avatars (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'es',
+    personality TEXT NOT NULL DEFAULT '',
+    voice_id TEXT NOT NULL DEFAULT '',
+    agent_id TEXT NOT NULL DEFAULT '',
+    mode TEXT NOT NULL DEFAULT 'normal',
+    status TEXT NOT NULL DEFAULT 'draft',
+    consent TEXT NOT NULL DEFAULT '{}',
+    created_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_email TEXT NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
@@ -456,6 +478,202 @@ app.get("/api/admin/leads", (req, res) => {
   res.json({ leads: rows.map((r) => ({ ...r, data: JSON.parse(r.data) })) });
 });
 
+// ── Panel de avatares (Fase 3): gestión de identidades del avatar en tiempo real ──
+// Los assets viven en el volumen persistente (DATA_DIR/avatars/<slug>/), nunca en el repo.
+// Flujo: crear ficha (con consentimiento) → subir material (identity.json + base.jpg
+// + idle.webm de crear-identidad.html, y opcionalmente el vídeo de registro en bruto)
+// → activar. Nada se procesa ni publica sin la confirmación explícita de activar.
+const AVATARS_DIR = path.join(DATA_DIR, "avatars");
+fs.mkdirSync(AVATARS_DIR, { recursive: true });
+
+function audit(user, action, detail) {
+  db.prepare("INSERT INTO audit_log (user_email, action, detail) VALUES (?, ?, ?)")
+    .run(user.email, action, String(detail || "").slice(0, 500));
+}
+function requireAdmin(req, res) {
+  const user = requireUser(req, res);
+  if (!user) return null;
+  if (!isAdmin(user)) { res.status(403).json({ error: "solo_administracion" }); return null; }
+  return user;
+}
+function avatarBySlug(slug) {
+  return db.prepare("SELECT * FROM avatars WHERE slug = ?").get(slug);
+}
+function avatarAssets(slug) {
+  const dir = path.join(AVATARS_DIR, slug);
+  const has = (f) => fs.existsSync(path.join(dir, f));
+  return {
+    identity: has("identity.json"),
+    base: has("base.jpg") || has("base.png"),
+    idle: has("idle.webm") || has("idle.mp4"),
+    registro: fs.existsSync(dir) && fs.readdirSync(dir).some((f) => f.startsWith("registro.")),
+  };
+}
+
+app.get("/api/avatars", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  const rows = db.prepare("SELECT * FROM avatars ORDER BY id DESC").all();
+  res.json({
+    avatars: rows.map((r) => ({ ...r, consent: JSON.parse(r.consent), assets: avatarAssets(r.slug) })),
+  });
+});
+
+app.post("/api/avatars", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  const b = req.body || {};
+  const slug = String(b.slug || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40);
+  if (!slug || slug === "demo") return res.status(400).json({ error: "slug_invalido" });
+  const name = String(b.name || "").trim().slice(0, 80);
+  if (!name) return res.status(400).json({ error: "nombre_vacio" });
+  const consent = b.consent || {};
+  // Consentimiento explícito obligatorio ANTES de crear nada (RGPD + política HAI)
+  if (!consent.autorizacion || !consent.recreacion || !String(consent.firma || "").trim()) {
+    return res.status(400).json({ error: "consentimiento_incompleto" });
+  }
+  const consentJson = JSON.stringify({
+    autorizacion: true,
+    recreacion: true,
+    firma: String(consent.firma).slice(0, 120),
+    relacion: String(consent.relacion || "").slice(0, 200),
+    fecha: new Date().toISOString(),
+    registrado_por: user.email,
+  });
+  try {
+    db.prepare(`INSERT INTO avatars (slug, name, language, personality, voice_id, agent_id, mode, consent, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      slug, name,
+      ["es", "ca", "en"].includes(b.language) ? b.language : "es",
+      String(b.personality || "").slice(0, 8000),
+      String(b.voice_id || "").slice(0, 64),
+      String(b.agent_id || "").slice(0, 64),
+      b.mode === "hologram" ? "hologram" : "normal",
+      consentJson, user.id
+    );
+  } catch (e) {
+    return res.status(409).json({ error: "slug_ya_existe" });
+  }
+  fs.mkdirSync(path.join(AVATARS_DIR, slug), { recursive: true });
+  audit(user, "avatar_crear", slug + " (" + name + ")");
+  res.json({ ok: true, slug });
+});
+
+app.put("/api/avatars/:slug", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  const av = avatarBySlug(req.params.slug);
+  if (!av) return res.status(404).json({ error: "no_encontrado" });
+  const b = req.body || {};
+  const status = ["draft", "processing", "active", "disabled"].includes(b.status) ? b.status : av.status;
+  if (status === "active") {
+    const assets = avatarAssets(av.slug);
+    if (!assets.identity || !assets.base) {
+      return res.status(400).json({ error: "faltan_assets", detail: "Sube identity.json y base.jpg antes de activar." });
+    }
+  }
+  db.prepare(`UPDATE avatars SET name=?, language=?, personality=?, voice_id=?, agent_id=?, mode=?, status=?,
+    updated_at=datetime('now') WHERE id=?`).run(
+    String(b.name || av.name).slice(0, 80),
+    ["es", "ca", "en"].includes(b.language) ? b.language : av.language,
+    b.personality !== undefined ? String(b.personality).slice(0, 8000) : av.personality,
+    b.voice_id !== undefined ? String(b.voice_id).slice(0, 64) : av.voice_id,
+    b.agent_id !== undefined ? String(b.agent_id).slice(0, 64) : av.agent_id,
+    b.mode === "hologram" ? "hologram" : b.mode === "normal" ? "normal" : av.mode,
+    status, av.id
+  );
+  audit(user, "avatar_editar", av.slug + " → " + status);
+  res.json({ ok: true });
+});
+
+app.delete("/api/avatars/:slug", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  const av = avatarBySlug(req.params.slug);
+  if (!av) return res.status(404).json({ error: "no_encontrado" });
+  // Borrado real y definitivo: ficha + todos los archivos (derecho de supresión)
+  db.prepare("DELETE FROM avatars WHERE id = ?").run(av.id);
+  fs.rmSync(path.join(AVATARS_DIR, av.slug), { recursive: true, force: true });
+  audit(user, "avatar_eliminar", av.slug);
+  res.json({ ok: true });
+});
+
+// Subida de material del avatar: kind = identity | base | idle | registro
+const AVATAR_KINDS = {
+  identity: { name: "identity.json", types: ["application/json"] },
+  base: { name: "base.jpg", types: ["image/jpeg", "image/png"] },
+  idle: { name: "idle.webm", types: ["video/webm", "video/mp4"] },
+  registro: { name: "registro", types: ["video/webm", "video/mp4", "video/quicktime"] },
+};
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, _file, cb) => {
+      const dir = path.join(AVATARS_DIR, req._avatarSlug);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const k = AVATAR_KINDS[req._assetKind];
+      if (k.name !== "registro") return cb(null, k.name);
+      const ext = (path.extname(file.originalname) || ".mp4").toLowerCase().slice(0, 6);
+      cb(null, "registro" + ext);
+    },
+  }),
+  limits: { fileSize: 300 * 1024 * 1024 },
+});
+
+app.post("/api/avatars/:slug/assets", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  const av = avatarBySlug(req.params.slug);
+  if (!av) return res.status(404).json({ error: "no_encontrado" });
+  const kind = String(req.query.kind || "");
+  if (!AVATAR_KINDS[kind]) return res.status(400).json({ error: "tipo_invalido" });
+  req._avatarSlug = av.slug;
+  req._assetKind = kind;
+  avatarUpload.single("file")(req, res, (err) => {
+    if (err || !req.file) {
+      return res.status(400).json({ error: err && err.code === "LIMIT_FILE_SIZE" ? "archivo_demasiado_grande" : "subida_fallida" });
+    }
+    // base.png en vez de jpg: renombrar el fijo si hace falta
+    if (kind === "base" && req.file.mimetype === "image/png") {
+      fs.renameSync(req.file.path, path.join(path.dirname(req.file.path), "base.png"));
+    }
+    // Si solo hay vídeo de registro, el avatar queda "processing" (pendiente de extraer identidad)
+    const assets = avatarAssets(av.slug);
+    if (av.status === "draft" && assets.registro && !assets.identity) {
+      db.prepare("UPDATE avatars SET status='processing', updated_at=datetime('now') WHERE id=?").run(av.id);
+    }
+    audit(user, "avatar_subida", av.slug + " · " + kind + " · " + req.file.originalname.slice(0, 80));
+    res.json({ ok: true, assets: avatarAssets(av.slug) });
+  });
+});
+
+// Servir la identidad y sus assets: públicos solo si el avatar está activo;
+// en cualquier otro estado, solo administración (previsualización).
+const IDENTITY_FILES = ["identity.json", "base.jpg", "base.png", "idle.webm", "idle.mp4"];
+app.get("/api/identities/:slug/:file", (req, res) => {
+  const slug = String(req.params.slug).toLowerCase().replace(/[^a-z0-9-]/g, "");
+  const file = req.params.file;
+  if (!IDENTITY_FILES.includes(file)) return res.status(404).json({ error: "no_encontrado" });
+  const av = avatarBySlug(slug);
+  if (!av) return res.status(404).json({ error: "no_encontrado" });
+  if (av.status !== "active") {
+    const u = currentUser(req);
+    if (!u || !isAdmin(u)) return res.status(404).json({ error: "no_encontrado" });
+  }
+  const p = path.join(AVATARS_DIR, slug, file);
+  if (!fs.existsSync(p)) return res.status(404).json({ error: "no_encontrado" });
+  res.setHeader("cache-control", "private, max-age=300");
+  res.sendFile(p);
+});
+
+app.get("/api/admin/audit", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  res.json({ audit: db.prepare("SELECT * FROM audit_log ORDER BY id DESC LIMIT 200").all() });
+});
+
 // ── Panel de administración (solo Montse) ──
 app.get("/api/admin/clients", (req, res) => {
   const user = requireUser(req, res);
@@ -710,11 +928,44 @@ async function ensureXiAgent() {
   return xiAgentCache;
 }
 
+// Agente propio por avatar: si la ficha no tiene agent_id asignado, se crea uno
+// a partir de su personalidad, idioma y voz, y se guarda en la ficha.
+async function ensureAvatarAgent(av) {
+  if (av.agent_id) return av.agent_id;
+  const created = await xiApi("/v1/convai/agents/create", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "HAI avatar · " + av.slug,
+      conversation_config: {
+        agent: {
+          language: av.language || "es",
+          prompt: { prompt: (av.personality || ("Eres " + av.name + ", un Human AI creado con la plataforma HAI.")) + "\n\n" + GUARDRAILS },
+        },
+        tts: { model_id: "eleven_flash_v2_5", ...((av.voice_id || XI_VOICE) ? { voice_id: av.voice_id || XI_VOICE } : {}) },
+      },
+    }),
+  });
+  db.prepare("UPDATE avatars SET agent_id=?, updated_at=datetime('now') WHERE id=?").run(created.agent_id, av.id);
+  console.log("Agente de ElevenLabs creado para avatar", av.slug + ":", created.agent_id);
+  return created.agent_id;
+}
+
 app.get("/api/agents/token", async (req, res) => {
   if (!XI_KEY) return res.status(503).json({ error: "avatar_no_configurado" });
   if (!rateLimit(clientIp(req), "agent-token", 30)) return res.status(429).json({ error: "demasiadas_peticiones" });
   try {
-    const agentId = await ensureXiAgent();
+    let agentId;
+    const slug = String(req.query.id || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (slug && slug !== "demo") {
+      const av = avatarBySlug(slug);
+      const u = av && av.status !== "active" ? currentUser(req) : null;
+      if (!av || (av.status !== "active" && !(u && isAdmin(u)))) {
+        return res.status(404).json({ error: "avatar_no_disponible" });
+      }
+      agentId = await ensureAvatarAgent(av);
+    } else {
+      agentId = await ensureXiAgent();
+    }
     try {
       // WebRTC (preferido: menos latencia y gestión de audio más robusta)
       const t = await xiApi("/v1/convai/conversation/token?agent_id=" + agentId);

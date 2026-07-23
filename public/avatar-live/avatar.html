@@ -99,9 +99,16 @@
   }
   function clearError() { errorEl.classList.remove("visible"); }
 
+  // "demo" vive en archivos estáticos; el resto de identidades se sirven desde
+  // el almacenamiento privado del servidor (solo avatares activos).
+  const identityUrl = identity === "demo"
+    ? "/avatar-live/identities/demo/identity.json"
+    : `/api/identities/${identity}/identity.json`;
+
   const avatar = new HaiAvatar({
     canvas: document.getElementById("avatarCanvas"),
-    identityUrl: `/avatar-live/identities/${identity}/identity.json`,
+    identityUrl,
+    avatarId: identity === "demo" ? "" : identity,
     demo,
     onState: (state, label) => {
       statusEl.dataset.state = state;

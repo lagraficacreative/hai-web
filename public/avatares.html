@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HAI · Panel de avatares</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#16335F; --surface:#1C3D6C; --surface2:#24487A; --border:#32547F;
+    --text:#F7FAFF; --dim:#A7BCD9; --primary:#7C6AF7; --accent:#22D3EE; --success:#34D399; --danger:#F87171; --warn:#FBBF24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;line-height:1.55;min-height:100vh}
+  h1,h2,h3{font-family:"Manrope",sans-serif;letter-spacing:-.02em}
+  a{color:inherit;text-decoration:none}
+  .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .logo{font-family:"Manrope";font-weight:700;font-size:18px}
+  header a{color:var(--dim);font-size:13px;margin-left:16px}
+  main{max-width:960px;margin:0 auto;padding:24px 20px 80px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
+  label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px}
+  label small{color:var(--dim);font-weight:400}
+  input[type=text],textarea,select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 13px;font-size:14px;font-family:inherit}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary)}
+  textarea{min-height:80px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media(max-width:640px){.row,.row3{grid-template-columns:1fr}}
+  .btn{display:inline-block;border:none;cursor:pointer;font-family:"Manrope";font-weight:600;font-size:14px;border-radius:10px;padding:10px 18px;transition:all .15s;margin:4px 6px 0 0}
+  .btn-primary{background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(248,113,113,.4)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;margin-left:8px;vertical-align:middle}
+  .tag.active{background:rgba(52,211,153,.15);color:var(--success)}
+  .tag.draft{background:rgba(154,154,176,.15);color:var(--dim)}
+  .tag.processing{background:rgba(251,191,36,.15);color:var(--warn)}
+  .tag.disabled{background:rgba(248,113,113,.12);color:var(--danger)}
+  .asset{display:inline-block;font-size:12px;color:var(--dim);border:1px solid var(--border);border-radius:99px;padding:3px 10px;margin:4px 6px 0 0}
+  .asset.ok{color:var(--success);border-color:rgba(52,211,153,.4)}
+  .check{display:flex;gap:10px;align-items:flex-start;margin-top:10px;font-size:13px;color:var(--dim)}
+  .check input{margin-top:3px;accent-color:#7C6AF7;flex-shrink:0}
+  .hint{color:var(--dim);font-size:12px;margin-top:4px}
+  .msg{text-align:center;color:var(--dim);padding:60px 20px}
+  .err{color:var(--danger);font-size:13px;margin-top:8px;display:none}
+  .head-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer}
+  .detail{display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
+  .detail.open{display:block}
+  .uploads{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .up{flex:1;min-width:180px;border:1px dashed var(--border);border-radius:10px;padding:10px;font-size:12.5px;color:var(--dim);text-align:center;cursor:pointer}
+  .up:hover{border-color:var(--primary)}
+  h2{font-size:17px;margin-bottom:4px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span class="grad-text">HAI</span> Panel de avatares</div>
+  <div><a href="admin.html">Administración</a><a href="avatar-live/crear-identidad.html">Crear identidad</a><a href="index.html">Web</a></div>
+</header>
+<main>
+  <h1 style="font-size:22px">Avatares en tiempo real</h1>
+  <p class="hint" style="margin-top:4px">Cada avatar tiene su identidad visual (de <a href="avatar-live/crear-identidad.html" style="color:var(--accent)">crear-identidad</a>), su voz de ElevenLabs y su agente conversacional. Nada se publica hasta que lo actives. El avatar «demo» es fijo y no aparece aquí.</p>
+
+  <div class="card" id="newCard">
+    <h2>➕ Registrar un avatar</h2>
+    <div class="row3">
+      <div><label>Identificador <small>(URL: /avatar?id=…)</small></label><input type="text" id="n_slug" placeholder="montse" /></div>
+      <div><label>Nombre visible</label><input type="text" id="n_name" placeholder="Montse Torrelles" /></div>
+      <div><label>Idioma principal</label><select id="n_language"><option value="es">Español</option><option value="ca">Català</option><option value="en">English</option></select></div>
+    </div>
+    <div class="row3">
+      <div><label>Voice ID de ElevenLabs <small>(vacío = voz por defecto)</small></label><input type="text" id="n_voice" placeholder="V43E…" /></div>
+      <div><label>Agent ID <small>(vacío = se crea solo al primer uso)</small></label><input type="text" id="n_agent" placeholder="agent_…" /></div>
+      <div><label>Modo preferido</label><select id="n_mode"><option value="normal">Normal (/avatar)</option><option value="hologram">Holograma (/hologram)</option></select></div>
+    </div>
+    <label>Personalidad <small>(quién es, cómo habla, qué sabe — será el prompt de su agente)</small></label>
+    <textarea id="n_personality" placeholder="Eres …, hablas en español cercano y BREVE (2-4 frases) porque tus respuestas se dicen en voz alta…"></textarea>
+    <div class="check"><input type="checkbox" id="n_c1" /><span><strong>Autorización:</strong> declaro que la persona representada (o sus herederos) ha dado su consentimiento explícito para crear este avatar con su imagen y su voz, y puedo acreditarlo.</span></div>
+    <div class="check"><input type="checkbox" id="n_c2" /><span>Entiendo que es una <strong>recreación digital</strong> generada por IA y que se mostrará como tal.</span></div>
+    <div class="row">
+      <div><label>Firma <small>(nombre completo de quien registra)</small></label><input type="text" id="n_firma" /></div>
+      <div><label>Relación con la persona <small>(yo misma, cliente, familiar…)</small></label><input type="text" id="n_relacion" /></div>
+    </div>
+    <div class="err" id="newErr"></div>
+    <button class="btn btn-primary" id="btnNew" style="margin-top:14px">Registrar avatar</button>
+  </div>
+
+  <div id="list"><div class="msg">Cargando…</div></div>
+</main>
+
+<script>
+(function () {
+  const list = document.getElementById("list");
+  const $ = (id) => document.getElementById(id);
+
+  async function api(url, opts) {
+    const r = await fetch(url, opts);
+    let body = {};
+    try { body = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error(body.detail || body.error || r.status);
+    return body;
+  }
+
+  document.getElementById("btnNew").onclick = async () => {
+    const err = $("newErr");
+    err.style.display = "none";
+    if (!$("n_c1").checked || !$("n_c2").checked || !$("n_firma").value.trim()) {
+      err.textContent = "Para registrar el avatar marca las dos casillas de consentimiento y firma con tu nombre.";
+      err.style.display = "block";
+      return;
+    }
+    try {
+      await api("/api/avatars", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug: $("n_slug").value, name: $("n_name").value, language: $("n_language").value,
+          voice_id: $("n_voice").value, agent_id: $("n_agent").value, mode: $("n_mode").value,
+          personality: $("n_personality").value,
+          consent: { autorizacion: true, recreacion: true, firma: $("n_firma").value, relacion: $("n_relacion").value },
+        }),
+      });
+      load();
+      ["n_slug","n_name","n_voice","n_agent","n_personality","n_firma","n_relacion"].forEach((i) => ($(i).value = ""));
+      $("n_c1").checked = $("n_c2").checked = false;
+    } catch (e) {
+      err.textContent = { slug_invalido: "Identificador inválido (minúsculas, números y guiones; 'demo' está reservado).",
+        slug_ya_existe: "Ya existe un avatar con ese identificador.", nombre_vacio: "Falta el nombre.",
+        consentimiento_incompleto: "Falta el consentimiento." }[e.message] || "No se ha podido crear (" + e.message + ").";
+      err.style.display = "block";
+    }
+  };
+
+  const STATUS_LABEL = { draft: "borrador", processing: "procesando identidad", active: "activo", disabled: "desactivado" };
+
+  function assetBadges(a) {
+    const items = [["identity", "identity.json"], ["base", "fotograma base"], ["idle", "bucle idle"], ["registro", "vídeo de registro"]];
+    return items.map(([k, label]) => '<span class="asset ' + (a[k] ? "ok" : "") + '">' + (a[k] ? "✓ " : "· ") + label + "</span>").join("");
+  }
+
+  async function load() {
+    let data;
+    try { data = await api("/api/avatars"); }
+    catch (e) {
+      list.innerHTML = '<div class="msg">' + (e.message === "solo_administracion"
+        ? "Esta zona es solo para administración de HAI."
+        : '<a href="cuenta.html?next=avatares.html" style="color:var(--accent);text-decoration:underline">Entra con tu cuenta</a> para gestionar los avatares.') + "</div>";
+      document.getElementById("newCard").style.display = "none";
+      return;
+    }
+    if (!data.avatars.length) { list.innerHTML = '<div class="msg">Aún no hay avatares. Registra el primero arriba.</div>'; return; }
+    list.innerHTML = "";
+    data.avatars.forEach((av) => list.appendChild(card(av)));
+  }
+
+  function card(av) {
+    const el = document.createElement("div");
+    el.className = "card";
+    el.innerHTML = `
+      <div class="head-row">
+        <div>
+          <h2>${esc(av.name)} <span style="color:var(--dim);font-weight:400;font-size:13px">· ${av.slug}</span>
+          <span class="tag ${av.status}">${STATUS_LABEL[av.status] || av.status}</span></h2>
+          <div class="hint">Consentimiento: ${esc((av.consent && av.consent.firma) || "—")} · ${av.consent && av.consent.fecha ? av.consent.fecha.slice(0, 10) : ""}
+            ${av.agent_id ? " · agente " + esc(av.agent_id.slice(0, 14)) + "…" : " · agente: se creará al primer uso"}</div>
+          <div>${assetBadges(av.assets)}</div>
+        </div>
+        <div class="hint">editar ▾</div>
+      </div>
+      <div class="detail">
+        <div class="row3">
+          <div><label>Nombre</label><input type="text" data-f="name" value="${esc(av.name)}" /></div>
+          <div><label>Idioma</label><select data-f="language">
+            <option value="es"${av.language === "es" ? " selected" : ""}>Español</option>
+            <option value="ca"${av.language === "ca" ? " selected" : ""}>Català</option>
+            <option value="en"${av.language === "en" ? " selected" : ""}>English</option></select></div>
+          <div><label>Modo preferido</label><select data-f="mode">
+            <option value="normal"${av.mode === "normal" ? " selected" : ""}>Normal</option>
+            <option value="hologram"${av.mode === "hologram" ? " selected" : ""}>Holograma</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Voice ID</label><input type="text" data-f="voice_id" value="${esc(av.voice_id)}" /></div>
+          <div><label>Agent ID <small>(vacío = crear automáticamente)</small></label><input type="text" data-f="agent_id" value="${esc(av.agent_id)}" /></div>
+        </div>
+        <label>Personalidad</label>
+        <textarea data-f="personality">${esc(av.personality)}</textarea>
+        <label style="margin-top:14px">Material de identidad <small>(los 3 archivos que exporta crear-identidad; o sube solo el vídeo de registro y lo procesamos)</small></label>
+        <div class="uploads">
+          <div class="up" data-kind="identity">📄 identity.json</div>
+          <div class="up" data-kind="base">🖼️ base.jpg / png</div>
+          <div class="up" data-kind="idle">🎞️ idle.webm</div>
+          <div class="up" data-kind="registro">🎬 vídeo de registro</div>
+        </div>
+        <input type="file" style="display:none" />
+        <div class="err"></div>
+        <div style="margin-top:14px">
+          <button class="btn btn-primary" data-a="save">Guardar cambios</button>
+          ${av.status === "active"
+            ? '<button class="btn btn-secondary" data-a="disable">Desactivar</button>'
+            : '<button class="btn btn-secondary" data-a="activate">✅ Activar</button>'}
+          <a class="btn btn-secondary" href="/avatar?id=${av.slug}" target="_blank">Probar /avatar</a>
+          <a class="btn btn-secondary" href="/hologram?id=${av.slug}" target="_blank">Probar /hologram</a>
+          <button class="btn btn-danger" data-a="delete">Eliminar definitivamente</button>
+        </div>
+      </div>`;
+
+    const detail = el.querySelector(".detail");
+    el.querySelector(".head-row").onclick = () => detail.classList.toggle("open");
+    const err = detail.querySelector(".err");
+    const showErr = (m) => { err.textContent = m; err.style.display = "block"; setTimeout(() => (err.style.display = "none"), 6000); };
+    const fields = () => {
+      const o = {};
+      detail.querySelectorAll("[data-f]").forEach((i) => (o[i.dataset.f] = i.value));
+      return o;
+    };
+    const put = async (extra) => {
+      try { await api("/api/avatars/" + av.slug, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...fields(), ...extra }) }); load(); }
+      catch (e) { showErr(e.message === "faltan_assets" ? "Faltan archivos: sube al menos identity.json y base.jpg antes de activar." : "No se ha podido guardar (" + e.message + ")."); }
+    };
+    detail.querySelector('[data-a="save"]').onclick = () => put({});
+    const act = detail.querySelector('[data-a="activate"]');
+    if (act) act.onclick = () => put({ status: "active" });
+    const dis = detail.querySelector('[data-a="disable"]');
+    if (dis) dis.onclick = () => put({ status: "disabled" });
+    detail.querySelector('[data-a="delete"]').onclick = async () => {
+      if (!confirm("Se borrará la ficha Y TODOS los archivos de «" + av.name + "» de forma definitiva (derecho de supresión). ¿Seguro?")) return;
+      try { await api("/api/avatars/" + av.slug, { method: "DELETE" }); load(); }
+      catch (e) { showErr("No se ha podido eliminar (" + e.message + ")."); }
+    };
+
+    const fileInput = detail.querySelector('input[type=file]');
+    detail.querySelectorAll(".up").forEach((zone) => {
+      zone.onclick = () => {
+        fileInput.accept = { identity: "application/json", base: "image/jpeg,image/png", idle: "video/webm,video/mp4", registro: "video/*" }[zone.dataset.kind];
+        fileInput.onchange = async () => {
+          const f = fileInput.files[0];
+          if (!f) return;
+          zone.textContent = "⏳ Subiendo…";
+          const fd = new FormData();
+          fd.append("file", f);
+          try { await api("/api/avatars/" + av.slug + "/assets?kind=" + zone.dataset.kind, { method: "POST", body: fd }); load(); }
+          catch (e) { showErr("Subida fallida (" + e.message + ")."); zone.textContent = "✗ Reintentar"; }
+          fileInput.value = "";
+        };
+        fileInput.click();
+      };
+    });
+    return el;
+  }
+
+  function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"); }
+  load();
+})();
+</script>
+</body>
+</html>

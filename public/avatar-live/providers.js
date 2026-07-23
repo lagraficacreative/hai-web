@@ -18,8 +18,9 @@ class Emitter {
 }
 
 export class ElevenLabsAgentsProvider extends Emitter {
-  constructor() {
+  constructor(avatarId) {
     super();
+    this.avatarId = avatarId || "";
     this.conversation = null;
     this.lastMode = "listening";
   }
@@ -39,7 +40,7 @@ export class ElevenLabsAgentsProvider extends Emitter {
 
     let auth;
     try {
-      const r = await fetch("/api/agents/token");
+      const r = await fetch("/api/agents/token" + (this.avatarId ? "?id=" + encodeURIComponent(this.avatarId) : ""));
       if (!r.ok) {
         const code = (await r.json().catch(() => ({}))).error || r.status;
         const msg = r.status === 503

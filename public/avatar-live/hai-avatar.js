@@ -20,9 +20,10 @@ export const STATE_LABELS = {
 };
 
 export class HaiAvatar {
-  constructor({ canvas, identityUrl, demo = false, onState = () => {}, onError = () => {}, onTranscript = () => {} }) {
+  constructor({ canvas, identityUrl, avatarId = "", demo = false, onState = () => {}, onError = () => {}, onTranscript = () => {} }) {
     this.renderer = new Hybrid2DRenderer(canvas);
     this.identityUrl = identityUrl;
+    this.avatarId = avatarId;
     this.demo = demo;
     this.provider = null;
     this.lipsync = null;
@@ -49,7 +50,7 @@ export class HaiAvatar {
 
   async startConversation() {
     if (this.provider) return;
-    this.provider = this.demo ? new DemoProvider() : new ElevenLabsAgentsProvider();
+    this.provider = this.demo ? new DemoProvider() : new ElevenLabsAgentsProvider(this.avatarId);
     this.provider
       .on("state", (s) => this._setState(s))
       .on("error", (msg) => this.onError(msg))

@@ -24,6 +24,7 @@ Alternativa propia a LiveAvatar (informe Fase 0 en los artefactos del proyecto):
 - Crear una identidad desde el vídeo de registro: `/avatar-live/crear-identidad.html` (todo en el navegador; exporta base.jpg + identity.json + idle.webm a `public/avatar-live/identities/<nombre>/`).
 - El SDK va empaquetado en `public/avatar-live/vendor/` (regenerar con `npm run build:avatar-vendor`).
 - LiveAvatar (avatar.html + `/api/avatar-embed`) sigue intacto como sistema alternativo.
+- **Panel de avatares** (`avatares.html`, solo administración): registrar avatares con consentimiento firmado, subir su material (identity.json/base/idle/vídeo de registro → volumen persistente `/app/data/avatars/`), asignar voz y agente (o se crea solo con su personalidad), activar/desactivar y eliminar con borrado real. Identidades dinámicas en `/api/identities/<slug>/…` (públicas solo si el avatar está activo) y acciones registradas en `audit_log`.
 
 ## IMPORTANTE: almacenamiento persistente
 

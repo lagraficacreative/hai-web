@@ -71,9 +71,13 @@
   }
 
   let state = "idle";
+  const identityUrl = identity === "demo"
+    ? "/avatar-live/identities/demo/identity.json"
+    : `/api/identities/${identity}/identity.json`;
   const avatar = new HaiAvatar({
     canvas,
-    identityUrl: `/avatar-live/identities/${identity}/identity.json`,
+    identityUrl,
+    avatarId: identity === "demo" ? "" : identity,
     demo,
     onState: (s) => { state = s; },
     onError: showError,
