@@ -750,6 +750,29 @@ app.get("/api/admin/clients/:id", (req, res) => {
   });
 });
 
+// Borrado definitivo de un cliente (derecho de supresión): cuenta, sesiones,
+// Human AI, chats, cuestionario y todos sus archivos del disco.
+app.delete("/api/admin/clients/:id", (req, res) => {
+  const user = requireAdmin(req, res);
+  if (!user) return;
+  const uid = Number(req.params.id);
+  const target = db.prepare("SELECT id, email FROM users WHERE id = ?").get(uid);
+  if (!target) return res.status(404).json({ error: "no_encontrado" });
+  if (ADMIN_EMAILS.includes(target.email.toLowerCase())) {
+    return res.status(400).json({ error: "no_se_puede_borrar_administracion" });
+  }
+  for (const f of db.prepare("SELECT path FROM files WHERE user_id = ?").all(uid)) {
+    try { fs.unlinkSync(f.path); } catch (e) {}
+  }
+  try { fs.rmSync(path.join(UPLOADS_DIR, String(uid)), { recursive: true, force: true }); } catch (e) {}
+  for (const t of ["files", "intake", "messages", "humans", "sessions"]) {
+    db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).run(uid);
+  }
+  db.prepare("DELETE FROM users WHERE id = ?").run(uid);
+  audit(user, "cliente_eliminar", target.email);
+  res.json({ ok: true });
+});
+
 // ── Chat público de la landing (María) ──
 app.post("/api/chat", async (req, res) => {
   if (!ANTHROPIC_KEY && !OPENAI_KEY) return res.status(503).json({ error: "chat_no_configurado" });

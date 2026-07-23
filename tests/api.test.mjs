@@ -163,6 +163,26 @@ test("métricas: se registran y se resumen", async () => {
   assert.equal(typeof m.resumen.msToFirstAudio_media, "number");
 });
 
+test("admin: borra un cliente con todos sus datos, pero nunca a administración", async () => {
+  // crear un cliente normal
+  const reg = await fetch(B + "/api/auth/register", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "cliente@test.com", password: "prueba1234", name: "Cliente" }),
+  });
+  assert.equal(reg.status, 200);
+  const clients = await (await j("/api/admin/clients")).json();
+  const target = clients.clients.find((c) => c.email === "cliente@test.com");
+  assert.ok(target);
+  // borrarlo
+  assert.equal((await j("/api/admin/clients/" + target.id, { method: "DELETE" })).status, 200);
+  const after = await (await j("/api/admin/clients")).json();
+  assert.ok(!after.clients.find((c) => c.email === "cliente@test.com"));
+  // la cuenta admin no se puede borrar
+  const me = after.clients.find((c) => c.email === "lagraficacreative@gmail.com");
+  const rr = await j("/api/admin/clients/" + me.id, { method: "DELETE" });
+  assert.equal(rr.status, 400);
+});
+
 test("token de agente: degrada con claridad sin API key", async () => {
   const r = await fetch(B + "/api/agents/token");
   // en el entorno de test no hay ELEVENLABS_API_KEY

@@ -146,6 +146,7 @@ export class DemoProvider extends Emitter {
         char_start_times_ms: chars.map((_, i) => i * 72),
         char_durations_ms: chars.map(() => 72),
       });
+      this.emit("transcript", { source: "agent", text: frase.trim() + "." });
       await this._wait(4800); if (this.stopped) return;
       this.speaking = false;
       this.emit("state", "interrupted");

@@ -44,6 +44,10 @@
   <div><a href="avatares.html" style="margin-right:16px">Avatares</a><a href="index.html" style="margin-right:16px">Web</a><button id="logoutBtn">Salir</button></div>
 </header>
 <main>
+  <h1 style="font-size:22px">Avatar en tiempo real · métricas</h1>
+  <p class="meta" style="margin-top:4px">Sesiones de conversación con el avatar propio (/avatar y /hologram). Vigila aquí los minutos consumidos de ElevenLabs.</p>
+  <div class="card" id="metricsCard" style="margin-top:14px"><span class="meta">Cargando…</span></div>
+
   <h1 style="font-size:22px">Solicitudes de experiencias</h1>
   <p class="meta" style="margin-top:4px">Formularios enviados desde las páginas de Business, Events, Museum, Tourism, Education y Home Live.</p>
   <div id="leadsList" style="margin-top:20px;margin-bottom:40px"><div class="msg">Cargando…</div></div>
@@ -81,6 +85,7 @@
     const r = await fetch("/api/admin/clients");
     if (r.status === 403) { list.innerHTML = '<div class="msg">Esta zona es solo para administración de HAI.<br/>Has entrado con una cuenta que no tiene permiso.</div>'; return; }
     renderLeads();
+    renderMetrics();
     const { clients } = await r.json();
     if (!clients.length) { list.innerHTML = '<div class="msg">Aún no hay clientes registrados.</div>'; return; }
     list.innerHTML = "";
@@ -121,12 +126,39 @@
           html += "<h2>🤖 Human AI configurado</h2><div class='qa'><div class='q'>" + (d.human.name || "") +
             (d.human.voice_id ? " · voz " + d.human.voice_id : "") + "</div><div class='a'>" + d.human.bio.replace(/</g, "&lt;") + "</div></div>";
         }
+        html += '<p style="margin-top:16px"><button class="del-btn" style="background:none;border:1px solid rgba(248,113,113,.45);color:var(--danger);border-radius:9px;padding:8px 14px;font-family:inherit;font-size:13px;cursor:pointer">🗑 Eliminar este cliente definitivamente</button></p>';
         detail.innerHTML = html || "<p class='meta'>Este cliente aún no ha rellenado nada.</p>";
+        const del = detail.querySelector(".del-btn");
+        if (del) del.onclick = async (ev) => {
+          ev.stopPropagation();
+          if (!confirm("Se borrará la cuenta " + c.email + " con TODOS sus datos y archivos, de forma definitiva. ¿Seguro?")) return;
+          const rr = await fetch("/api/admin/clients/" + c.id, { method: "DELETE" });
+          if (!rr.ok) { alert((await rr.json()).error === "no_se_puede_borrar_administracion" ? "Las cuentas de administración no se pueden borrar desde aquí." : "No se ha podido borrar."); return; }
+          card.remove();
+        };
         detail.dataset.loaded = "1";
       };
       list.appendChild(card);
     });
   }
+  async function renderMetrics() {
+    const box = document.getElementById("metricsCard");
+    const r = await fetch("/api/admin/metrics").catch(() => null);
+    if (!r || !r.ok) { box.innerHTML = '<span class="meta">No se han podido cargar.</span>'; return; }
+    const { resumen } = await r.json();
+    if (!resumen.total) { box.innerHTML = '<span class="meta">Aún no hay sesiones registradas.</span>'; return; }
+    const s = (v, suf) => (v === null || v === undefined ? "—" : v + (suf || ""));
+    box.innerHTML =
+      '<div class="meta" style="display:flex;flex-wrap:wrap;gap:18px;font-size:14px;color:var(--text)">' +
+      "<span>🗣️ <strong>" + resumen.total + "</strong> sesiones</span>" +
+      "<span>⏱️ conexión media <strong>" + s(resumen.msToConnected_media, " ms") + "</strong></span>" +
+      "<span>🔊 primer audio <strong>" + s(resumen.msToFirstAudio_media, " ms") + "</strong></span>" +
+      "<span>🎞️ <strong>" + s(resumen.fps_media) + "</strong> fps</span>" +
+      "<span>✋ <strong>" + resumen.interrupciones_total + "</strong> interrupciones</span>" +
+      "<span>💬 <strong>" + s(resumen.minutos_conversacion_total, " min") + "</strong> de conversación</span>" +
+      "</div>";
+  }
+
   async function renderLeads() {
     const box = document.getElementById("leadsList");
     const r = await fetch("/api/admin/leads").catch(() => null);

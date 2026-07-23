@@ -67,10 +67,17 @@ export class HaiAvatar {
 
     this.provider
       .on("state", (s) => {
-        if (s === "listening" && this.metrics.msToConnected === null) {
+        if (s === "listening" && this.metrics && this.metrics.msToConnected === null) {
           this.metrics.msToConnected = Math.round(performance.now() - this.metrics.tStart);
         }
-        if (s === "interrupted") this.metrics.interruptions++;
+        if (s === "interrupted" && this.metrics) this.metrics.interruptions++;
+        // Corte inesperado (red, fin de sesión remoto): avisar para reconectar
+        if (s === "ended" && !this._stopping && this.provider) {
+          this.onError("La conversación se ha cortado. Pulsa «Hablar con HAI» para reconectar.");
+          this.stopConversation(false);
+          this._setState("ended");
+          return;
+        }
         this._setState(s);
       })
       .on("error", (msg) => this.onError(msg))
@@ -128,6 +135,8 @@ export class HaiAvatar {
   get active() { return !!this.provider; }
 
   async stopConversation(toIdle = true) {
+    this._stopping = true;
+    setTimeout(() => (this._stopping = false), 1500);
     cancelAnimationFrame(this.animRaf);
     this._sendMetrics();
     const p = this.provider;
