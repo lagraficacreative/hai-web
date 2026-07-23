@@ -1228,9 +1228,11 @@ app.get("/api/avatar-embed", async (req, res) => {
 const XI_AGENT_ID = process.env.ELEVENLABS_AGENT_ID || "";
 const XI_AGENT_NAME = "HAI asistente web (avatar-live) v1";
 let xiAgentCache = XI_AGENT_ID || null;
-// Eventos que el agente debe emitir al navegador. "alignment" (timing por
-// carácter) alimenta los visemas del lip sync avanzado.
-const XI_CLIENT_EVENTS = ["audio", "interruption", "user_transcript", "agent_response", "agent_response_correction", "alignment"];
+// Eventos que el agente debe emitir al navegador. NO existe "alignment" como
+// client_event: los timings por carácter viajan DENTRO del evento "audio"
+// (lo expone el SDK como onAudioAlignment); así los visemas del lip sync
+// avanzado quedan cubiertos solo con pedir "audio".
+const XI_CLIENT_EVENTS = ["audio", "interruption", "user_transcript", "agent_response", "agent_response_correction"];
 const xiPatchedAgents = new Set();
 // Asegura que un agente ya existente tenga los client_events necesarios
 // (los creados antes de los visemas, o creados a mano en el panel de ElevenLabs).
