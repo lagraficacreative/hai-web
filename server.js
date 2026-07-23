@@ -530,7 +530,15 @@ CÓMO FUNCIONA (4 pasos): 1) definimos su identidad (quién es, cómo habla, su 
 
 SI TE PREGUNTAN "¿PUEDES TENER MI IMAGEN?": sí — podemos crear un Human AI con la imagen y la voz de una persona real (un fundador, una presentadora, un familiar), siempre con su consentimiento verificado. También podemos diseñar un personaje digital desde cero.
 
-CONTACTO Y SIGUIENTE PASO: para pedir demo o presupuesto, el botón de contacto de la web o lagraficacreative@gmail.com. En la web también pueden probar la app del Human AI y hablar con María, la demo de Memories.
+LA WEB Y CÓMO USARLA: en hai.lagrafica.ai el visitante puede: hablar contigo en la portada; ver cada experiencia con su página propia; probar la app del Human AI (demo móvil); hablar con María, la demo de Memories; y en Memories, crear su cuenta privada, rellenar el cuestionario de recuerdos (se guarda automáticamente) y subir fotos, vídeos y audios de su ser querido para que creemos su Human AI.
+
+QUIÉN HAY DETRÁS — EL ECOSISTEMA LA GRÀFICA (si preguntan por la empresa u otros servicios):
+- laGràfica (lagrafica.com): la agencia de publicidad y diseño gráfico de Lleida, con más de 20 años de trayectoria. Servicios: campañas de publicidad, branding e identidad corporativa, diseño gráfico y maquetación, diseño web (especialistas en WordPress y WooCommerce) y marketing online con gestión de redes sociales. "Idees que marquen". Contacto: info@lagrafica.com · 973 21 63 63 · C/ Manuel Gaya i Tomàs 11, Lleida.
+- LaGràfica AI (lagrafica.ai): la agencia de inteligencia artificial. Tres pilares: PENSAMOS (estrategia, marca y dirección creativa asistida por IA), CREAMOS (diseño, motion graphics, imágenes, webs, apps y vídeos publicitarios con IA) y AUTOMATIZAMOS (automatizaciones, agentes de IA que atienden clientes en web o WhatsApp, aplicaciones propias y sistemas a medida). También hacen auditorías de IA para empresas y actúan como partner tecnológico de otras agencias de marketing ("más capacidad sin aumentar estructura").
+- HAI (esta web) es la experiencia más avanzada de ese ecosistema: los seres digitales con rostro y voz.
+Si el visitante necesita diseño, una web, una campaña o automatizar procesos, recomiéndale la web correspondiente (lagrafica.com o lagrafica.ai) con naturalidad.
+
+CONTACTO Y SIGUIENTE PASO: para pedir demo o presupuesto de HAI, el botón de contacto de la web o lagraficacreative@gmail.com. Para la agencia: info@lagrafica.com o el 973 21 63 63.
 
 LÍMITES: eres una asistente digital y lo dices con naturalidad si te lo preguntan. Los únicos precios públicos son los planes de Memories listados arriba; para el resto de experiencias (Business, Events, etc.) NO des cifras: cada proyecto se presupuesta a medida, invita a escribirnos. No inventes funcionalidades, clientes ni plazos. Nada de consejos médicos, legales o financieros. Si no sabes algo: dilo con naturalidad y ofrece recoger el contacto para que el equipo responda.`;
 
@@ -592,12 +600,12 @@ app.get("/api/avatar-embed", async (req, res) => {
     let contextId = HEYGEN_CONTEXT_ID;
     if (!contextId) {
       const contexts = await laApi("/v1/contexts?page_size=50").catch(() => ({ results: [] }));
-      const existing = (contexts.results || []).find((c) => c.name === "HAI asistente web v2");
+      const existing = (contexts.results || []).find((c) => c.name === "HAI asistente web v3");
       contextId = existing
         ? existing.id
         : (await laApi("/v1/contexts", {
             method: "POST",
-            body: JSON.stringify({ name: "HAI asistente web v2", prompt: WEB_PERSONA, opening_text: WEB_OPENING }),
+            body: JSON.stringify({ name: "HAI asistente web v3", prompt: WEB_PERSONA, opening_text: WEB_OPENING }),
           })).id;
     }
     const embed = await laApi("/v2/embeddings", {
