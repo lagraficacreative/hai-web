@@ -85,6 +85,7 @@
       <button class="btn" id="voiceActivateBtn" type="button" style="display:none">Preparar la conversación por voz</button>
       <a class="btn" id="voiceOpenBtn" style="display:none;text-align:center">🎙️ Abrir conversación por voz</a>
       <a class="btn btn-ghost" id="hologramOpenBtn" style="display:none;text-align:center">Modo holograma</a>
+      <button class="btn btn-ghost" id="voiceRedoBtn" type="button" style="display:none">🔄 Rehacer con la foto más reciente</button>
     </div>
     <div class="saved" id="voiceMsg" style="margin:0;min-height:16px"></div>
   </div>
@@ -164,8 +165,9 @@
   }
 
   function renderVoiceCard() {
-    const activar = $("voiceActivateBtn"), abrir = $("voiceOpenBtn"), holo = $("hologramOpenBtn"), hint = $("voiceHint");
-    activar.style.display = abrir.style.display = holo.style.display = "none";
+    const activar = $("voiceActivateBtn"), abrir = $("voiceOpenBtn"), holo = $("hologramOpenBtn"),
+          redo = $("voiceRedoBtn"), hint = $("voiceHint");
+    activar.style.display = abrir.style.display = holo.style.display = redo.style.display = "none";
     if (!health.avatarLive) {
       hint.textContent = "La conversación por voz aún no está activada en el servidor. Vuelve pronto.";
       return;
@@ -173,7 +175,8 @@
     if (human.avatar_ready) {
       abrir.href = "/avatar?human=me"; abrir.style.display = "inline-block";
       holo.href = "/hologram?human=me&captions=true"; holo.style.display = "inline-block";
-      hint.textContent = "Está listo. Abre la conversación por voz y pulsa «Hablar con HAI» — le hablarás y él te responderá con su voz.";
+      redo.style.display = "inline-block";
+      hint.textContent = "Está listo. Abre la conversación por voz y pulsa «Hablar con HAI». Si subes una foto nueva o cambias su personalidad, pulsa «Rehacer» para actualizar su cara.";
       return;
     }
     if (!human.bio) {
@@ -246,20 +249,23 @@
     img.src = "/api/files/" + uploadedPhotoId;
   };
 
-  $("voiceActivateBtn").onclick = async () => {
-    $("voiceActivateBtn").disabled = true;
-    $("voiceMsg").textContent = "Preparándolo… (crea su agente de voz, tarda unos segundos)";
+  async function prepareVoice(btn, doneMsg, redirect) {
+    btn.disabled = true;
+    $("voiceMsg").textContent = "Preparándolo… (unos segundos)";
     try {
       const r = await fetch("/api/human/activate-avatar", { method: "POST" });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || data.error || r.status);
-      $("voiceMsg").textContent = "✓ Listo. Abriendo la conversación por voz…";
-      setTimeout(() => { location.href = data.url || "/avatar?human=me"; }, 600);
+      $("voiceMsg").textContent = doneMsg;
+      if (redirect) setTimeout(() => { location.href = data.url || "/avatar?human=me"; }, 600);
+      else setTimeout(() => { $("voiceMsg").textContent = ""; btn.disabled = false; }, 3500);
     } catch (e) {
       $("voiceMsg").textContent = "No se ha podido preparar (" + e.message + ").";
-      $("voiceActivateBtn").disabled = false;
+      btn.disabled = false;
     }
-  };
+  }
+  $("voiceActivateBtn").onclick = () => prepareVoice($("voiceActivateBtn"), "✓ Listo. Abriendo la conversación por voz…", true);
+  $("voiceRedoBtn").onclick = () => prepareVoice($("voiceRedoBtn"), "✓ Actualizado con la foto más reciente. Ya puedes abrir la conversación.", false);
 
   $("fromIntakeBtn").onclick = async () => {
     $("fromIntakeBtn").disabled = true;

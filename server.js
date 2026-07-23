@@ -365,10 +365,18 @@ app.post("/api/human/activate-avatar", async (req, res) => {
   if (!human || !human.bio) {
     return res.status(400).json({ error: "sin_personalidad", detail: "Primero pulsa «✨ Crear desde el cuestionario» para darle su forma de ser." });
   }
-  const foto = db.prepare("SELECT path, mime FROM files WHERE user_id = ? AND kind = 'fotos' ORDER BY id LIMIT 1").get(user.id);
+  // Elegimos la última foto subida (la más reciente) para reflejar cambios
+  // como "he subido otra foto mejor" sin tener que borrar la antigua.
+  const foto = db.prepare("SELECT path, mime FROM files WHERE user_id = ? AND kind = 'fotos' ORDER BY id DESC LIMIT 1").get(user.id);
   if (!foto || !fs.existsSync(foto.path)) {
     return res.status(400).json({ error: "sin_foto", detail: "Sube al menos una fotografía en el cuestionario para poder ponerle cara." });
   }
+  // Limpieza: si en un intento anterior había un formato distinto (jpg vs png
+  // vs webp), borramos los archivos base.* huérfanos antes de escribir el nuevo.
+  ["base.jpg", "base.png", "base.webp"].forEach((f) => {
+    const p = path.join(HUMANS_AVATAR_DIR, String(user.id), f);
+    if (fs.existsSync(p)) try { fs.unlinkSync(p); } catch (e) {}
+  });
 
   const dir = path.join(HUMANS_AVATAR_DIR, String(user.id));
   fs.mkdirSync(dir, { recursive: true });
