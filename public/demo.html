@@ -11,19 +11,19 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <style>
   :root {
-    --bg:#0A0A0F; --surface:#12121A; --surface2:#1A1A26; --border:#26263A;
-    --text:#F4F4F8; --dim:#9A9AB0; --primary:#7C6AF7; --glow:#A78BFA;
+    --bg:#16335F; --surface:#1C3D6C; --surface2:#24487A; --border:#32547F;
+    --text:#F7FAFF; --dim:#A7BCD9; --primary:#7C6AF7; --glow:#A78BFA;
     --accent:#22D3EE; --danger:#F87171; --success:#34D399;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   @media(min-width:700px){body{max-width:480px;margin:0 auto;border-left:1px solid var(--border);border-right:1px solid var(--border)}}
-  body{background:var(--bg);color:var(--text);font-family:"Inter",system-ui,sans-serif;
+  body{background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;
     display:flex;flex-direction:column;overflow:hidden;
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 
   header{text-align:center;padding:14px 16px 6px}
-  header .logo{font-family:"Sora";font-weight:700;font-size:17px}
+  header .logo{font-family:"Manrope";font-weight:700;font-size:17px}
   .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
 
   /* Avatar */
@@ -34,14 +34,14 @@
     background:radial-gradient(circle at 35% 30%,#A78BFA 0%,#7C6AF7 45%,#22D3EE 100%);
     box-shadow:0 0 60px rgba(124,106,247,.45);
     display:flex;align-items:center;justify-content:center;
-    font-family:"Sora";font-weight:700;font-size:56px;color:#fff;
+    font-family:"Manrope";font-weight:700;font-size:56px;color:#fff;
     animation:breathe 4s ease-in-out infinite;will-change:transform}
   .avatar img{width:100%;height:100%;object-fit:cover;display:block}
   @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
   .listening .ring{border-color:rgba(34,211,238,.7);animation:pulse 1.2s ease-out infinite}
   .thinking .avatar{animation-duration:1s}
   @keyframes pulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.28);opacity:0}}
-  .persona{margin-top:12px;font-family:"Sora";font-weight:600;font-size:17px}
+  .persona{margin-top:12px;font-family:"Manrope";font-weight:600;font-size:17px}
   .status{color:var(--dim);font-size:13px;min-height:18px;margin-top:2px;text-align:center}
 
   /* Chat */

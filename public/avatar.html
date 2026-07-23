@@ -4,26 +4,26 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>HAI · Habla en directo con el Human AI de Montse</title>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg:#0A0A0F; --surface:#12121A; --surface2:#1A1A26; --border:#26263A;
-    --text:#F4F4F8; --dim:#9A9AB0; --primary:#7C6AF7; --glow:#A78BFA;
+    --bg:#16335F; --surface:#1C3D6C; --surface2:#24487A; --border:#32547F;
+    --text:#F7FAFF; --dim:#A7BCD9; --primary:#7C6AF7; --glow:#A78BFA;
     --accent:#22D3EE; --success:#34D399; --danger:#F87171;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:"Inter",system-ui,sans-serif;line-height:1.55;min-height:100vh;display:flex;flex-direction:column}
-  h1{font-family:"Sora",sans-serif;letter-spacing:-.02em}
+  body{background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;line-height:1.55;min-height:100vh;display:flex;flex-direction:column}
+  h1{font-family:"Manrope",sans-serif;letter-spacing:-.02em}
   a{color:inherit;text-decoration:none}
   .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
   header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .logo{font-family:"Sora";font-weight:700;font-size:18px}
+  .logo{font-family:"Manrope";font-weight:700;font-size:18px}
   header a.back{color:var(--dim);font-size:13px}
   header a.back:hover{color:var(--text)}
   main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:14px}
   h1{font-size:clamp(20px,4vw,26px);text-align:center}
   .sub{color:var(--dim);font-size:14px;text-align:center;max-width:520px}
-  .frame-wrap{height:min(78vh,820px);aspect-ratio:9/16;width:auto;max-width:94vw;background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 0 48px rgba(124,106,247,.18)}
+  .frame-wrap{height:min(78vh,820px);aspect-ratio:9/16;width:auto;max-width:94vw;background:var(--surface);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.28)}
   .frame-wrap iframe{width:100%;height:100%;border:0}
   .state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;padding:24px;text-align:center;color:var(--dim);font-size:14px}
   .orb{width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#A78BFA,#7C6AF7 55%,#22D3EE);filter:blur(.5px);animation:pulse 2.4s ease-in-out infinite}

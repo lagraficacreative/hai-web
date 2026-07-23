@@ -4,25 +4,25 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>HAI · Mi Human AI</title>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg:#0A0A0F; --surface:#12121A; --surface2:#1A1A26; --border:#26263A;
-    --text:#F4F4F8; --dim:#9A9AB0; --primary:#7C6AF7; --accent:#22D3EE; --success:#34D399; --danger:#F87171;
+    --bg:#16335F; --surface:#1C3D6C; --surface2:#24487A; --border:#32547F;
+    --text:#F7FAFF; --dim:#A7BCD9; --primary:#7C6AF7; --accent:#22D3EE; --success:#34D399; --danger:#F87171;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:"Inter",system-ui,sans-serif;line-height:1.55;min-height:100vh;display:flex;flex-direction:column}
-  h1,h2{font-family:"Sora",sans-serif;letter-spacing:-.02em}
+  body{background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;line-height:1.55;min-height:100vh;display:flex;flex-direction:column}
+  h1,h2{font-family:"Manrope",sans-serif;letter-spacing:-.02em}
   a{color:inherit;text-decoration:none}
   .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
   header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .logo{font-family:"Sora";font-weight:700;font-size:18px}
+  .logo{font-family:"Manrope";font-weight:700;font-size:18px}
   .head-actions{display:flex;gap:14px;align-items:center;color:var(--dim);font-size:13px}
   .head-actions button{background:none;border:none;color:var(--dim);font-family:inherit;font-size:13px;cursor:pointer}
   .head-actions button:hover, .head-actions a:hover{color:var(--text)}
   main{flex:1;width:min(680px,100%);margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:16px}
   .persona{display:flex;align-items:center;gap:14px}
-  .avatar{width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#A78BFA,#7C6AF7 55%,#22D3EE);display:flex;align-items:center;justify-content:center;font-family:"Sora";font-size:26px;font-weight:700;overflow:hidden;flex-shrink:0;transition:transform .12s}
+  .avatar{width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#A78BFA,#7C6AF7 55%,#22D3EE);display:flex;align-items:center;justify-content:center;font-family:"Manrope";font-size:26px;font-weight:700;overflow:hidden;flex-shrink:0;transition:transform .12s}
   .avatar img{width:100%;height:100%;object-fit:cover}
   .persona h1{font-size:22px}
   .persona .state{color:var(--dim);font-size:13px;min-height:18px}
@@ -33,11 +33,11 @@
   .chat-input{display:flex;gap:8px;border-top:1px solid var(--border);padding:12px}
   .chat-input input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 14px;font-size:14px;font-family:inherit}
   .chat-input input:focus{outline:none;border-color:var(--primary)}
-  .btn{border:none;cursor:pointer;font-family:"Inter";font-weight:600;font-size:14px;border-radius:10px;padding:11px 18px;background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff}
+  .btn{border:none;cursor:pointer;font-family:"Manrope";font-weight:600;font-size:14px;border-radius:10px;padding:11px 18px;background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff}
   .btn:hover{filter:brightness(1.08)}
   .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
   details{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px}
-  summary{cursor:pointer;font-weight:600;font-size:15px;font-family:"Sora"}
+  summary{cursor:pointer;font-weight:600;font-size:15px;font-family:"Manrope"}
   label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
   label small{color:var(--dim);font-weight:400}
   input[type=text],textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 14px;font-size:14px;font-family:inherit}
