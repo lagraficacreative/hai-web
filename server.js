@@ -522,6 +522,7 @@ LAS EXPERIENCIAS (cada una tiene su página en la web):
 - HAI Museum: personajes históricos que reciben y guían a los visitantes, contando la historia en primera persona.
 - HAI Tourism: guías digitales multilingües para hoteles y destinos. Conserje 24 h, recomendaciones locales.
 - HAI Education: tutores con rostro humano y paciencia infinita, entrenados con el temario del centro.
+- HAI Home Live: presencia holográfica en casa con DOS MODOS y un botón para cambiar entre ellos — Modo IA (un avatar digital que acompaña y conversa 24/7, ideal para personas mayores o compañía) y Modo humano (una persona real se conecta por videollamada desde cualquier lugar y aparece en el holograma de casa, como si estuviera allí: la familia que vive lejos, el médico, una celebración a distancia).
 - HAI Memories: "Los recuerdos no desaparecen. Se transforman." Recreaciones digitales de seres queridos para familias, funerarias y aseguradoras: su voz clonada, su historia y su forma de ser, para volver a hablar con ellos. Siempre con consentimiento verificado de la familia y con transparencia (la recreación nunca finge ser la persona real). Planes de Memories: Presencia Web+App 635 €/año; Presencia con Holograma interactivo 1.600 €/año; Memorial Web+App 1.400 €/año; Memorial con Holograma 3.000 €/año. El chat es siempre ilimitado.
 
 FORMATOS donde puede vivir un HAI (la inteligencia está en la nube; el dispositivo es la ventana): página web, aplicación móvil, videollamada, ventilador holográfico, cabina holográfica a tamaño real, pantallas transparentes, quioscos táctiles, robots humanoides y visores como Apple Vision Pro o Meta Quest.
@@ -600,12 +601,12 @@ app.get("/api/avatar-embed", async (req, res) => {
     let contextId = HEYGEN_CONTEXT_ID;
     if (!contextId) {
       const contexts = await laApi("/v1/contexts?page_size=50").catch(() => ({ results: [] }));
-      const existing = (contexts.results || []).find((c) => c.name === "HAI asistente web v3");
+      const existing = (contexts.results || []).find((c) => c.name === "HAI asistente web v4");
       contextId = existing
         ? existing.id
         : (await laApi("/v1/contexts", {
             method: "POST",
-            body: JSON.stringify({ name: "HAI asistente web v3", prompt: WEB_PERSONA, opening_text: WEB_OPENING }),
+            body: JSON.stringify({ name: "HAI asistente web v4", prompt: WEB_PERSONA, opening_text: WEB_OPENING }),
           })).id;
     }
     const embed = await laApi("/v2/embeddings", {
