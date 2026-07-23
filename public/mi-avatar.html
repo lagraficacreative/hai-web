@@ -78,6 +78,17 @@
     </div>
   </div>
 
+  <div id="voiceCard" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px">
+    <div style="font-weight:600">🎙️ Habla con él por voz, con su cara</div>
+    <div class="hint" id="voiceHint" style="margin:0">Cuando tenga su personalidad y una foto, aquí podrás abrir la conversación por voz en la que se le ve la cara y los labios acompañando lo que dice.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="voiceActivateBtn" type="button" style="display:none">Preparar la conversación por voz</button>
+      <a class="btn" id="voiceOpenBtn" style="display:none;text-align:center">🎙️ Abrir conversación por voz</a>
+      <a class="btn btn-ghost" id="hologramOpenBtn" style="display:none;text-align:center">Modo holograma</a>
+    </div>
+    <div class="saved" id="voiceMsg" style="margin:0;min-height:16px"></div>
+  </div>
+
   <a class="btn btn-ghost" href="cuestionario.html" style="text-align:center">📔 Cuestionario de recuerdos — responde y sube fotos, vídeos y audios</a>
 
   <details id="settings">
@@ -90,8 +101,10 @@
     <div class="photo-row">
       <div class="photo-thumb" id="photoThumb">sin foto</div>
       <button class="btn btn-ghost" id="photoBtn" type="button">Elegir foto</button>
+      <button class="btn btn-ghost" id="adoptPhotoBtn" type="button" style="display:none">Usar la del cuestionario</button>
       <input type="file" id="photoInput" accept="image/*" style="display:none" />
     </div>
+    <p class="hint" id="photoHint" style="display:none">Es una de las fotos que subiste en el cuestionario. Pulsa «Guardar» para dejarla fija como su cara.</p>
     <label>Voice ID de ElevenLabs <small>(opcional — su voz clonada; sin él usa la voz general)</small></label>
     <input id="f_voiceId" type="text" placeholder="p. ej. pNInz6obpgDQGcFmaJgB" />
     <p class="hint">Cuanto más rica sea la historia, más se parecerá a la persona. Puedes editarla siempre que quieras.</p>
@@ -106,8 +119,19 @@
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
-  let human = { name: "Mi Human AI", bio: "", photo: "", voice_id: "" };
+  let human = { name: "Mi Human AI", bio: "", photo: "", voice_id: "", agent_id: "", avatar_ready: 0 };
   let voiceOn = true, busy = false, health = { chat: false, tts: false };
+  let uploadedPhotoId = null; // primera foto subida en el cuestionario, si la hay
+
+  // Reduce una imagen a un recorte cuadrado de 512px como data URL (para guardarla como cara)
+  function downscaleToDataUrl(img) {
+    const c = document.createElement("canvas");
+    const s = Math.min(img.width, img.height, 512);
+    c.width = c.height = s;
+    const side = Math.min(img.width, img.height);
+    c.getContext("2d").drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, s, s);
+    return c.toDataURL("image/jpeg", 0.82);
+  }
 
   function addBubble(text, user) {
     const b = document.createElement("div");
@@ -123,13 +147,45 @@
     $("f_bio").value = human.bio || "";
     $("f_voiceId").value = human.voice_id || "";
     const initial = (human.name || "H").charAt(0).toUpperCase();
-    if (human.photo) {
-      $("avatar").innerHTML = '<img src="' + human.photo + '" alt="" />';
-      $("photoThumb").innerHTML = '<img src="' + human.photo + '" alt="" />';
+    // Prioridad: foto ya guardada > primera foto del cuestionario > inicial
+    const src = human.photo || (uploadedPhotoId ? "/api/files/" + uploadedPhotoId : "");
+    if (src) {
+      $("avatar").innerHTML = '<img src="' + src + '" alt="" />';
+      $("photoThumb").innerHTML = '<img src="' + src + '" alt="" />';
     } else {
       $("avatar").innerHTML = '<span id="avatarInitial">' + initial + "</span>";
       $("photoThumb").textContent = "sin foto";
     }
+    // Ofrecer fijar la foto del cuestionario si aún no hay una guardada
+    const puedeAdoptar = !human.photo && uploadedPhotoId;
+    $("adoptPhotoBtn").style.display = puedeAdoptar ? "inline-block" : "none";
+    $("photoHint").style.display = puedeAdoptar ? "block" : "none";
+    renderVoiceCard();
+  }
+
+  function renderVoiceCard() {
+    const activar = $("voiceActivateBtn"), abrir = $("voiceOpenBtn"), holo = $("hologramOpenBtn"), hint = $("voiceHint");
+    activar.style.display = abrir.style.display = holo.style.display = "none";
+    if (!health.avatarLive) {
+      hint.textContent = "La conversación por voz aún no está activada en el servidor. Vuelve pronto.";
+      return;
+    }
+    if (human.avatar_ready) {
+      abrir.href = "/avatar?human=me"; abrir.style.display = "inline-block";
+      holo.href = "/hologram?human=me&captions=true"; holo.style.display = "inline-block";
+      hint.textContent = "Está listo. Abre la conversación por voz y pulsa «Hablar con HAI» — le hablarás y él te responderá con su voz.";
+      return;
+    }
+    if (!human.bio) {
+      hint.textContent = "Primero pulsa «✨ Crear desde el cuestionario» abajo para darle su forma de ser.";
+      return;
+    }
+    if (!uploadedPhotoId && !human.photo) {
+      hint.textContent = "Sube al menos una fotografía suya en el cuestionario para poder ponerle cara.";
+      return;
+    }
+    activar.style.display = "inline-block";
+    hint.textContent = "Tenemos su personalidad y una foto. Un clic y le montamos la conversación por voz con su cara y sus labios acompañando lo que dice.";
   }
 
   async function init() {
@@ -141,6 +197,13 @@
     health = await fetch("/api/health").then((r) => r.json()).catch(() => health);
     const h = await fetch("/api/human").then((r) => r.json());
     human = h.human;
+
+    // Si no tiene cara guardada, buscamos la primera foto subida en el cuestionario
+    if (!human.photo) {
+      const f = await fetch("/api/files").then((r) => r.json()).catch(() => ({ files: [] }));
+      const foto = (f.files || []).find((x) => x.kind === "fotos");
+      if (foto) uploadedPhotoId = foto.id;
+    }
     applyHuman();
 
     const msgs = await fetch("/api/human/messages").then((r) => r.json()).catch(() => ({ messages: [] }));
@@ -166,16 +229,36 @@
     const f = $("photoInput").files[0];
     if (!f) return;
     const img = new Image();
-    img.onload = () => {
-      const c = document.createElement("canvas");
-      const s = Math.min(img.width, img.height, 512);
-      c.width = c.height = s;
-      const side = Math.min(img.width, img.height);
-      c.getContext("2d").drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, s, s);
-      human.photo = c.toDataURL("image/jpeg", 0.82);
-      applyHuman();
-    };
+    img.onload = () => { human.photo = downscaleToDataUrl(img); applyHuman(); };
     img.src = URL.createObjectURL(f);
+  };
+
+  // Fijar como cara la foto que se subió en el cuestionario
+  $("adoptPhotoBtn").onclick = () => {
+    if (!uploadedPhotoId) return;
+    const img = new Image();
+    img.onload = () => {
+      human.photo = downscaleToDataUrl(img); // misma imagen, mismo origen: el canvas no se contamina
+      applyHuman();
+      $("savedMsg").textContent = "Foto lista — pulsa «Guardar» para dejarla fija.";
+    };
+    img.onerror = () => { $("savedMsg").textContent = "No se ha podido cargar la foto."; };
+    img.src = "/api/files/" + uploadedPhotoId;
+  };
+
+  $("voiceActivateBtn").onclick = async () => {
+    $("voiceActivateBtn").disabled = true;
+    $("voiceMsg").textContent = "Preparándolo… (crea su agente de voz, tarda unos segundos)";
+    try {
+      const r = await fetch("/api/human/activate-avatar", { method: "POST" });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || data.error || r.status);
+      $("voiceMsg").textContent = "✓ Listo. Abriendo la conversación por voz…";
+      setTimeout(() => { location.href = data.url || "/avatar?human=me"; }, 600);
+    } catch (e) {
+      $("voiceMsg").textContent = "No se ha podido preparar (" + e.message + ").";
+      $("voiceActivateBtn").disabled = false;
+    }
   };
 
   $("fromIntakeBtn").onclick = async () => {

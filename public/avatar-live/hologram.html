@@ -75,13 +75,16 @@
   let state = "idle";
   const captions = params.get("captions") === "true" || params.get("captions") === "1";
   const captionsEl = document.getElementById("captions");
-  const identityUrl = identity === "demo"
-    ? "/avatar-live/identities/demo/identity.json"
-    : `/api/identities/${identity}/identity.json`;
+  const humanMode = params.get("human") === "me";
+  const identityUrl = humanMode
+    ? "/api/human/identity/identity.json"
+    : identity === "demo"
+      ? "/avatar-live/identities/demo/identity.json"
+      : `/api/identities/${identity}/identity.json`;
   const avatar = new HaiAvatar({
     canvas,
     identityUrl,
-    avatarId: identity === "demo" ? "" : identity,
+    avatarId: humanMode ? "me" : identity === "demo" ? "" : identity,
     demo,
     onState: (s) => { state = s; },
     onError: showError,

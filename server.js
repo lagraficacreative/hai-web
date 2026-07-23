@@ -130,8 +130,53 @@ db.exec(`
   );
 `);
 
+// Migraciones idempotentes (SQLite no admite IF NOT EXISTS en ALTER)
+for (const sql of [
+  "ALTER TABLE humans ADD COLUMN agent_id TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE humans ADD COLUMN avatar_ready INTEGER NOT NULL DEFAULT 0",
+]) { try { db.exec(sql); } catch (e) { /* columna ya existe */ } }
+
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+const HUMANS_AVATAR_DIR = path.join(DATA_DIR, "humans-avatar");
+fs.mkdirSync(HUMANS_AVATAR_DIR, { recursive: true });
+
+// Lee las dimensiones de una imagen sin dependencias (JPEG y PNG suficientes).
+function imageDims(buf) {
+  if (buf.length >= 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+    return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+  }
+  if (buf.length > 4 && buf[0] === 0xFF && buf[1] === 0xD8) {
+    let i = 2;
+    while (i < buf.length - 9) {
+      if (buf[i] !== 0xFF) return null;
+      const marker = buf[i + 1];
+      const isSOF = (marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC5 && marker <= 0xC7) ||
+                    (marker >= 0xC9 && marker <= 0xCB) || (marker >= 0xCD && marker <= 0xCF);
+      const len = buf.readUInt16BE(i + 2);
+      if (isSOF) return { w: buf.readUInt16BE(i + 7), h: buf.readUInt16BE(i + 5) };
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+
+// Genera unas coordenadas de identidad razonables para un retrato frontal
+// centrado y de medio cuerpo. Coincide con proporciones típicas y con las que
+// usa el renderer; el usuario podrá afinarlo después con crear-identidad.html.
+function identityFromPortrait(w, h, name, imageName) {
+  return {
+    name, image: imageName, idleVideo: null,
+    width: w, height: h,
+    mouth: { x: Math.round(w * 0.42), y: Math.round(h * 0.60), w: Math.round(w * 0.16), h: Math.round(h * 0.045) },
+    chinY: Math.round(h * 0.72),
+    eyes: [
+      { x: Math.round(w * 0.34), y: Math.round(h * 0.395), w: Math.round(w * 0.11), h: Math.round(h * 0.035) },
+      { x: Math.round(w * 0.55), y: Math.round(h * 0.395), w: Math.round(w * 0.11), h: Math.round(h * 0.035) },
+    ],
+    skin: null, innerMouth: "#2c1215",
+  };
+}
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "lagraficacreative@gmail.com")
   .toLowerCase().split(",").map((e) => e.trim()).filter(Boolean);
 const USER_QUOTA_BYTES = Number(process.env.USER_QUOTA_MB || 500) * 1024 * 1024;
@@ -302,9 +347,79 @@ app.get("/api/auth/me", (req, res) => {
 app.get("/api/human", (req, res) => {
   const user = requireUser(req, res);
   if (!user) return;
-  const human = db.prepare("SELECT name, bio, photo, voice_id FROM humans WHERE user_id = ?").get(user.id) ||
-    { name: "Mi Human AI", bio: "", photo: "", voice_id: "" };
+  const human = db.prepare("SELECT name, bio, photo, voice_id, agent_id, avatar_ready FROM humans WHERE user_id = ?").get(user.id) ||
+    { name: "Mi Human AI", bio: "", photo: "", voice_id: "", agent_id: "", avatar_ready: 0 };
   res.json({ human });
+});
+
+// Prepara el avatar hablable privado del usuario: coge su personalidad + su
+// primera foto y crea agente + identidad. No expone a los demás — solo el
+// dueño (o admin) puede pedir su identidad y su token.
+app.post("/api/human/activate-avatar", async (req, res) => {
+  const user = requireUser(req, res);
+  if (!user) return;
+  if (!XI_KEY) return res.status(503).json({ error: "avatar_no_configurado" });
+  if (!rateLimit("u" + user.id, "activate-avatar", 5)) return res.status(429).json({ error: "demasiadas_peticiones" });
+
+  const human = db.prepare("SELECT name, bio, voice_id, agent_id FROM humans WHERE user_id = ?").get(user.id);
+  if (!human || !human.bio) {
+    return res.status(400).json({ error: "sin_personalidad", detail: "Primero pulsa «✨ Crear desde el cuestionario» para darle su forma de ser." });
+  }
+  const foto = db.prepare("SELECT path, mime FROM files WHERE user_id = ? AND kind = 'fotos' ORDER BY id LIMIT 1").get(user.id);
+  if (!foto || !fs.existsSync(foto.path)) {
+    return res.status(400).json({ error: "sin_foto", detail: "Sube al menos una fotografía en el cuestionario para poder ponerle cara." });
+  }
+
+  const dir = path.join(HUMANS_AVATAR_DIR, String(user.id));
+  fs.mkdirSync(dir, { recursive: true });
+  const ext = foto.mime === "image/png" ? "png" : foto.mime === "image/webp" ? "webp" : "jpg";
+  const baseName = "base." + ext;
+  fs.copyFileSync(foto.path, path.join(dir, baseName));
+  const buf = fs.readFileSync(foto.path);
+  const dims = imageDims(buf) || { w: 900, h: 1200 };
+  const identity = identityFromPortrait(dims.w, dims.h, human.name || "Human AI", baseName);
+  fs.writeFileSync(path.join(dir, "identity.json"), JSON.stringify(identity, null, 2));
+
+  let agentId = human.agent_id;
+  if (!agentId) {
+    try {
+      const created = await xiApi("/v1/convai/agents/create", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "HAI Memories · " + (human.name || "Human AI") + " · usuario " + user.id,
+          conversation_config: {
+            agent: {
+              language: "es",
+              prompt: { prompt: (human.bio || "") + "\n\n" + GUARDRAILS },
+            },
+            tts: { model_id: "eleven_flash_v2_5", ...((human.voice_id || XI_VOICE) ? { voice_id: human.voice_id || XI_VOICE } : {}) },
+            conversation: { client_events: XI_CLIENT_EVENTS },
+          },
+        }),
+      });
+      agentId = created.agent_id;
+    } catch (err) {
+      console.error("activate-avatar agent error:", err.message);
+      return res.status(502).json({ error: "error_agente", detail: err.message.slice(0, 200) });
+    }
+  }
+  db.prepare("UPDATE humans SET agent_id = ?, avatar_ready = 1, updated_at = datetime('now') WHERE user_id = ?")
+    .run(agentId, user.id);
+  audit(user, "human_activate_avatar", human.name || "");
+  res.json({ ok: true, url: "/avatar?human=me" });
+});
+
+// Sirve la identidad privada del avatar del usuario (solo dueño o admin)
+const HUMAN_IDENTITY_FILES = ["identity.json", "base.jpg", "base.png", "base.webp"];
+app.get("/api/human/identity/:file", (req, res) => {
+  const user = currentUser(req);
+  if (!user) return res.status(401).json({ error: "no_autenticado" });
+  const file = req.params.file;
+  if (!HUMAN_IDENTITY_FILES.includes(file)) return res.status(404).json({ error: "no_encontrado" });
+  const p = path.join(HUMANS_AVATAR_DIR, String(user.id), file);
+  if (!fs.existsSync(p)) return res.status(404).json({ error: "no_encontrado" });
+  res.setHeader("cache-control", "private, no-cache");
+  res.sendFile(p);
 });
 
 app.put("/api/human", (req, res) => {
@@ -1200,16 +1315,24 @@ app.get("/api/agents/token", async (req, res) => {
   if (!rateLimit(clientIp(req), "agent-token", 30)) return res.status(429).json({ error: "demasiadas_peticiones" });
   try {
     let agentId;
-    const slug = String(req.query.id || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
-    if (slug && slug !== "demo") {
-      const av = avatarBySlug(slug);
-      const u = av && av.status !== "active" ? currentUser(req) : null;
-      if (!av || (av.status !== "active" && !(u && isAdmin(u)))) {
-        return res.status(404).json({ error: "avatar_no_disponible" });
-      }
-      agentId = await ensureAvatarAgent(av);
+    if (req.query.human === "me") {
+      const u = currentUser(req);
+      if (!u) return res.status(401).json({ error: "no_autenticado" });
+      const h = db.prepare("SELECT agent_id FROM humans WHERE user_id = ?").get(u.id);
+      if (!h || !h.agent_id) return res.status(404).json({ error: "avatar_no_activado" });
+      agentId = h.agent_id;
     } else {
-      agentId = await ensureXiAgent();
+      const slug = String(req.query.id || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
+      if (slug && slug !== "demo") {
+        const av = avatarBySlug(slug);
+        const u = av && av.status !== "active" ? currentUser(req) : null;
+        if (!av || (av.status !== "active" && !(u && isAdmin(u)))) {
+          return res.status(404).json({ error: "avatar_no_disponible" });
+        }
+        agentId = await ensureAvatarAgent(av);
+      } else {
+        agentId = await ensureXiAgent();
+      }
     }
     await ensureXiClientEvents(agentId);
     try {

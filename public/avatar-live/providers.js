@@ -40,7 +40,9 @@ export class ElevenLabsAgentsProvider extends Emitter {
 
     let auth;
     try {
-      const r = await fetch("/api/agents/token" + (this.avatarId ? "?id=" + encodeURIComponent(this.avatarId) : ""));
+      const tokenQuery = this.avatarId === "me" ? "?human=me"
+        : this.avatarId ? "?id=" + encodeURIComponent(this.avatarId) : "";
+      const r = await fetch("/api/agents/token" + tokenQuery);
       if (!r.ok) {
         const code = (await r.json().catch(() => ({}))).error || r.status;
         const msg = r.status === 503
