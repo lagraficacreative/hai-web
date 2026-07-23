@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>HAI · Modo holograma</title>
+<style>
+  /* Fondo negro puro y cero interfaz: pensado para ventilador/cabina holográfica */
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#000;height:100%;overflow:hidden}
+  body{display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;cursor:default}
+  body.hide-cursor{cursor:none}
+  #wrap{position:relative;height:100dvh;width:100vw;display:flex;align-items:center;justify-content:center}
+  canvas{height:100%;max-width:100vw;display:block}
+  /* Arranque: requiere un gesto del usuario (autoplay/micro/fullscreen) */
+  #startOverlay{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:10}
+  #startOverlay .orb{width:110px;height:110px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#A78BFA,#7C6AF7 55%,#22D3EE);animation:pulse 2.4s ease-in-out infinite;filter:blur(.5px)}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.08);opacity:1}}
+  #startOverlay p{color:#9A9AB0;font-size:15px}
+  #startOverlay button{font-size:16px;font-weight:600;color:#fff;background:linear-gradient(135deg,#7C6AF7,#22D3EE);border:0;border-radius:14px;padding:14px 30px;cursor:pointer}
+  #startOverlay button:focus-visible{outline:3px solid #22D3EE;outline-offset:3px}
+  /* Controles mínimos: aparecen solo al tocar la pantalla, se auto-ocultan */
+  #controls{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);display:none;gap:12px;z-index:9}
+  #controls.visible{display:flex}
+  #controls button{font-size:14px;color:#F4F4F8;background:rgba(18,18,26,.85);border:1px solid #26263A;border-radius:12px;padding:10px 20px;cursor:pointer}
+  /* Transparencia IA (obligatoria en la UE): discreta pero presente */
+  #iaMark{position:fixed;bottom:10px;right:14px;color:#fff;opacity:.28;font-size:11px;letter-spacing:.08em;z-index:8;user-select:none}
+  #debug{position:fixed;top:10px;left:10px;color:#34D399;font:12px/1.5 monospace;z-index:9;display:none;white-space:pre}
+  #err{position:fixed;top:14px;left:50%;transform:translateX(-50%);color:#F87171;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);border-radius:10px;padding:8px 14px;font-size:13px;z-index:11;display:none;max-width:88vw;text-align:center}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="avatarCanvas" aria-label="Avatar holográfico de HAI"></canvas></div>
+
+<div id="startOverlay">
+  <div class="orb"></div>
+  <p>HAI · Modo holograma</p>
+  <button id="btnStart" autofocus>Iniciar</button>
+</div>
+
+<div id="controls">
+  <button id="btnEnd">Finalizar</button>
+  <button id="btnFs">Pantalla completa</button>
+</div>
+<div id="iaMark">IA</div>
+<div id="debug"></div>
+<div id="err" role="alert"></div>
+
+<script type="module">
+  import { HaiAvatar } from "/avatar-live/hai-avatar.js";
+
+  const params = new URLSearchParams(location.search);
+  const demo = params.get("demo") === "1";
+  const debug = params.get("debug") === "true" || params.get("debug") === "1";
+  const mirror = params.get("mirror") === "true" || params.get("mirror") === "1";
+  const scale = Math.min(1.6, Math.max(0.7, parseFloat(params.get("scale")) || 1));
+  const identity = (params.get("id") || "demo").replace(/[^\w-]/g, "");
+
+  const canvas = document.getElementById("avatarCanvas");
+  const overlay = document.getElementById("startOverlay");
+  const controls = document.getElementById("controls");
+  const debugEl = document.getElementById("debug");
+  const errEl = document.getElementById("err");
+  canvas.style.transform = `scale(${mirror ? -scale : scale}, ${scale})`;
+  if (debug) debugEl.style.display = "block";
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.style.display = "block";
+    setTimeout(() => (errEl.style.display = "none"), 8000);
+  }
+
+  let state = "idle";
+  const avatar = new HaiAvatar({
+    canvas,
+    identityUrl: `/avatar-live/identities/${identity}/identity.json`,
+    demo,
+    onState: (s) => { state = s; },
+    onError: showError,
+  });
+  avatar.load().catch(() => showError("No se ha podido cargar el avatar."));
+
+  // Wake Lock: mantener la pantalla encendida mientras dura la experiencia
+  let wakeLock = null;
+  async function acquireWakeLock() {
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => (wakeLock = null));
+      }
+    } catch (e) { /* no soportado o denegado: seguimos sin él */ }
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !wakeLock && state !== "idle") acquireWakeLock();
+  });
+
+  async function goFullscreen() {
+    try { await document.documentElement.requestFullscreen({ navigationUI: "hide" }); }
+    catch (e) { /* iPhone no lo soporta: la web sigue funcionando */ }
+  }
+
+  document.getElementById("btnStart").addEventListener("click", async () => {
+    overlay.style.display = "none";
+    await goFullscreen();
+    await acquireWakeLock();
+    try { await avatar.startConversation(); }
+    catch (e) { showControls(); }
+  });
+
+  document.getElementById("btnEnd").addEventListener("click", async () => {
+    await avatar.stopConversation();
+    if (wakeLock) { try { await wakeLock.release(); } catch (e) {} }
+    if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
+    overlay.style.display = "flex";
+    controls.classList.remove("visible");
+  });
+
+  document.getElementById("btnFs").addEventListener("click", goFullscreen);
+
+  // Interfaz invisible: un toque muestra los controles 4 s; cursor oculto tras 3 s
+  let hideTimer = 0, cursorTimer = 0;
+  function showControls() {
+    if (overlay.style.display === "none") {
+      controls.classList.add("visible");
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => controls.classList.remove("visible"), 4000);
+    }
+  }
+  window.addEventListener("pointerdown", showControls);
+  window.addEventListener("pointermove", () => {
+    document.body.classList.remove("hide-cursor");
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(() => document.body.classList.add("hide-cursor"), 3000);
+  });
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") showControls(); });
+
+  // Debug: estado, volumen del agente y FPS
+  if (debug) {
+    let frames = 0, fps = 0, t0 = performance.now();
+    (function meter() {
+      frames++;
+      const now = performance.now();
+      if (now - t0 >= 1000) { fps = frames; frames = 0; t0 = now; }
+      debugEl.textContent =
+        `estado: ${state}\nvol: ${avatar.getOutputVolume().toFixed(3)}\nfps: ${fps}` +
+        `\nmirror: ${mirror} · scale: ${scale}\nwakeLock: ${!!wakeLock}`;
+      requestAnimationFrame(meter);
+    })();
+  }
+
+  window.addEventListener("pagehide", () => avatar.dispose());
+</script>
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HAI · Crear identidad de avatar (herramienta interna)</title>
+<style>
+  :root{--bg:#0A0A0F;--surface:#12121A;--border:#26263A;--text:#F4F4F8;--dim:#9A9AB0;--primary:#7C6AF7;--accent:#22D3EE;--danger:#F87171;--warn:#FBBF24;--success:#34D399}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;line-height:1.5;padding:20px;max-width:1100px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px}
+  h2{font-size:15px;margin:18px 0 8px;color:var(--accent)}
+  p.dim{color:var(--dim);font-size:13.5px}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-top:14px}
+  button{font-size:14px;font-weight:600;border:0;border-radius:10px;padding:9px 16px;cursor:pointer;background:#26263A;color:var(--text);margin:3px 4px 3px 0}
+  button.primary{background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff}
+  button.mark.active{outline:2px solid var(--accent)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input[type=number],input[type=text]{background:#1A1A26;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;width:90px;font-size:14px}
+  input[type=text]{width:180px}
+  label{font-size:13px;color:var(--dim);margin-right:4px}
+  video{max-width:100%;max-height:320px;border-radius:10px;background:#000}
+  .canvas-wrap{position:relative;display:inline-block;max-width:100%}
+  #frameCanvas,#previewCanvas{max-width:100%;max-height:520px;border-radius:10px;border:1px solid var(--border)}
+  #overlay{position:absolute;inset:0;cursor:crosshair}
+  .badge{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;margin:2px 4px 2px 0;border:1px solid var(--border);color:var(--dim)}
+  .badge.ok{color:var(--success);border-color:var(--success)}
+  .warns{font-size:13px;color:var(--warn);margin-top:6px;white-space:pre-line}
+  .hidden{display:none}
+  code{background:#1A1A26;padding:1px 6px;border-radius:6px;font-size:12.5px}
+  ol{margin:8px 0 0 20px;font-size:13.5px;color:var(--dim)}
+</style>
+</head>
+<body>
+<h1>Crear identidad de avatar <span style="color:var(--dim);font-size:14px">herramienta interna · todo se procesa en tu navegador, no se sube nada</span></h1>
+<p class="dim">Del vídeo de registro salen: un fotograma base, un bucle idle corto y las coordenadas de boca/ojos/barbilla. Con eso el avatar ya habla en /avatar y /hologram.</p>
+
+<div class="panel">
+  <h2>1 · Vídeo de registro</h2>
+  <p class="dim">Frontal, 30 s–2 min, buena luz, una sola persona, lo más quieta posible (los primeros segundos en silencio, mirando a cámara, van perfectos para el idle).</p>
+  <input type="file" id="videoFile" accept="video/*" />
+  <div class="warns" id="videoWarns"></div>
+  <div style="margin-top:10px"><video id="video" controls playsinline class="hidden"></video></div>
+</div>
+
+<div class="panel hidden" id="stepFrame">
+  <h2>2 · Fotograma base</h2>
+  <p class="dim">Busca en el vídeo un momento con la boca cerrada y expresión neutra, y captura.</p>
+  <button class="primary" id="btnCapture">📸 Usar este fotograma como base</button>
+  <div class="canvas-wrap" style="margin-top:10px">
+    <canvas id="frameCanvas" class="hidden"></canvas>
+    <canvas id="overlay" class="hidden"></canvas>
+  </div>
+</div>
+
+<div class="panel hidden" id="stepMarks">
+  <h2>3 · Marcar zonas <span id="markBadges"></span></h2>
+  <p class="dim">Selecciona qué vas a marcar y arrastra un rectángulo sobre la imagen. La barbilla es una línea horizontal: haz clic a su altura.</p>
+  <button class="mark" data-mark="mouth">👄 Boca (labios cerrados)</button>
+  <button class="mark" data-mark="eyeL">👁 Ojo izquierdo</button>
+  <button class="mark" data-mark="eyeR">👁 Ojo derecho</button>
+  <button class="mark" data-mark="chin">⬇️ Línea de barbilla</button>
+</div>
+
+<div class="panel hidden" id="stepIdle">
+  <h2>4 · Bucle idle (opcional pero recomendado)</h2>
+  <p class="dim">Elige un tramo del vídeo donde esté quieta y en silencio; se graba en bucle como fondo vivo (respiración y micro-movimientos reales).</p>
+  <label>Inicio (s)</label><input type="number" id="idleStart" value="0" min="0" step="0.5" />
+  <label>Duración (s)</label><input type="number" id="idleDur" value="6" min="3" max="12" step="0.5" />
+  <button id="btnRecord">⏺ Grabar bucle idle</button>
+  <span class="badge" id="idleBadge">sin grabar</span>
+</div>
+
+<div class="panel hidden" id="stepPreview">
+  <h2>5 · Previsualizar</h2>
+  <button class="primary" id="btnPreview">▶ Probar el avatar (boca sintética)</button>
+  <div style="margin-top:10px"><canvas id="previewCanvas" style="aspect-ratio:3/4;height:420px;background:radial-gradient(ellipse at 50% 30%,#181828,#0d0d14 70%)"></canvas></div>
+</div>
+
+<div class="panel hidden" id="stepExport">
+  <h2>6 · Exportar</h2>
+  <label>Nombre corto (carpeta)</label><input type="text" id="slug" value="montse" />
+  <button class="primary" id="btnExport">⬇️ Descargar archivos de identidad</button>
+  <ol>
+    <li>Se descargan <code>base.jpg</code>, <code>identity.json</code> y, si lo has grabado, <code>idle.webm</code>.</li>
+    <li>Van a la carpeta <code>public/avatar-live/identities/&lt;nombre&gt;/</code> del repo <code>hai-web</code> (o pásaselos a Claude y los coloca él).</li>
+    <li>Después el avatar vive en <code>/avatar?id=&lt;nombre&gt;</code> y <code>/hologram?id=&lt;nombre&gt;</code>.</li>
+  </ol>
+</div>
+
+<script type="module">
+  import { Hybrid2DRenderer } from "/avatar-live/renderer2d.js";
+
+  const $ = (id) => document.getElementById(id);
+  const video = $("video");
+  const frameCanvas = $("frameCanvas");
+  const overlay = $("overlay");
+  const fctx = frameCanvas.getContext("2d");
+  const octx = overlay.getContext("2d");
+
+  const marks = { mouth: null, eyeL: null, eyeR: null, chin: null };
+  let markMode = null;
+  let idleBlob = null;
+  let baseBlob = null;
+  let W = 0, H = 0;
+
+  // ── 1 · Cargar vídeo y validaciones ligeras (las duras van al servidor en Fase 3) ──
+  $("videoFile").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    video.src = URL.createObjectURL(f);
+    video.classList.remove("hidden");
+    video.addEventListener("loadedmetadata", () => {
+      W = video.videoWidth; H = video.videoHeight;
+      const warns = [];
+      if (Math.min(W, H) < 720) warns.push("⚠ Resolución baja (" + W + "×" + H + "): mejor 1080p.");
+      if (video.duration < 15) warns.push("⚠ Vídeo muy corto (" + Math.round(video.duration) + " s): ideal 30 s–2 min.");
+      if (video.duration > 150) warns.push("⚠ Vídeo largo: con 2 min basta.");
+      $("videoWarns").textContent = warns.join("\n") || "✓ " + W + "×" + H + " · " + Math.round(video.duration) + " s";
+      $("stepFrame").classList.remove("hidden");
+      $("idleDur").max = Math.min(12, Math.floor(video.duration));
+    }, { once: true });
+  });
+
+  // ── 2 · Capturar fotograma base ──
+  $("btnCapture").addEventListener("click", () => {
+    frameCanvas.width = W; frameCanvas.height = H;
+    overlay.width = W; overlay.height = H;
+    fctx.drawImage(video, 0, 0, W, H);
+    frameCanvas.classList.remove("hidden");
+    overlay.classList.remove("hidden");
+    frameCanvas.toBlob((b) => (baseBlob = b), "image/jpeg", 0.92);
+    ["stepMarks", "stepIdle", "stepPreview", "stepExport"].forEach((s) => $(s).classList.remove("hidden"));
+    drawMarks();
+  });
+
+  // ── 3 · Marcar rects/línea sobre el overlay ──
+  document.querySelectorAll("button.mark").forEach((b) =>
+    b.addEventListener("click", () => {
+      markMode = b.dataset.mark;
+      document.querySelectorAll("button.mark").forEach((x) => x.classList.toggle("active", x === b));
+    })
+  );
+
+  function toImageCoords(ev) {
+    const r = overlay.getBoundingClientRect();
+    return {
+      x: ((ev.clientX - r.left) / r.width) * W,
+      y: ((ev.clientY - r.top) / r.height) * H,
+    };
+  }
+
+  let dragStart = null;
+  overlay.addEventListener("pointerdown", (ev) => {
+    if (!markMode) return;
+    const p = toImageCoords(ev);
+    if (markMode === "chin") { marks.chin = Math.round(p.y); drawMarks(); updateBadges(); return; }
+    dragStart = p;
+    overlay.setPointerCapture(ev.pointerId);
+  });
+  overlay.addEventListener("pointermove", (ev) => {
+    if (!dragStart || !markMode || markMode === "chin") return;
+    const p = toImageCoords(ev);
+    marks[markMode] = normRect(dragStart, p);
+    drawMarks();
+  });
+  overlay.addEventListener("pointerup", () => { dragStart = null; updateBadges(); });
+
+  function normRect(a, b) {
+    return {
+      x: Math.round(Math.min(a.x, b.x)), y: Math.round(Math.min(a.y, b.y)),
+      w: Math.round(Math.abs(b.x - a.x)), h: Math.round(Math.abs(b.y - a.y)),
+    };
+  }
+
+  function drawMarks() {
+    octx.clearRect(0, 0, W, H);
+    octx.lineWidth = Math.max(2, W / 400);
+    const draw = (r, color, label) => {
+      if (!r) return;
+      octx.strokeStyle = color;
+      octx.strokeRect(r.x, r.y, r.w, r.h);
+      octx.fillStyle = color;
+      octx.font = `${Math.max(14, W / 50)}px system-ui`;
+      octx.fillText(label, r.x, r.y - 6);
+    };
+    draw(marks.mouth, "#22D3EE", "boca");
+    draw(marks.eyeL, "#34D399", "ojo izq");
+    draw(marks.eyeR, "#34D399", "ojo der");
+    if (marks.chin) {
+      octx.strokeStyle = "#FBBF24";
+      octx.beginPath(); octx.moveTo(0, marks.chin); octx.lineTo(W, marks.chin); octx.stroke();
+      octx.fillStyle = "#FBBF24";
+      octx.fillText("barbilla", 10, marks.chin - 6);
+    }
+  }
+
+  function updateBadges() {
+    $("markBadges").innerHTML = ["mouth", "eyeL", "eyeR", "chin"]
+      .map((k) => `<span class="badge ${marks[k] ? "ok" : ""}">${k}</span>`).join("");
+  }
+  updateBadges();
+
+  // ── 4 · Grabar bucle idle (canvas → MediaRecorder, sin subir nada) ──
+  $("btnRecord").addEventListener("click", async () => {
+    const start = parseFloat($("idleStart").value) || 0;
+    const dur = Math.min(12, Math.max(3, parseFloat($("idleDur").value) || 6));
+    const rc = document.createElement("canvas");
+    rc.width = W; rc.height = H;
+    const rctx = rc.getContext("2d");
+    const stream = rc.captureStream(30);
+    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+    const chunks = [];
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    const done = new Promise((res) => (rec.onstop = res));
+
+    video.currentTime = start;
+    await new Promise((res) => video.addEventListener("seeked", res, { once: true }));
+    await video.play();
+    rec.start(250);
+    $("idleBadge").textContent = "grabando…";
+    let painting = true;
+    (function paint() { if (!painting) return; rctx.drawImage(video, 0, 0, W, H); requestAnimationFrame(paint); })();
+    await new Promise((res) => setTimeout(res, dur * 1000));
+    painting = false;
+    rec.stop(); video.pause();
+    await done;
+    idleBlob = new Blob(chunks, { type: "video/webm" });
+    $("idleBadge").textContent = "✓ " + dur + " s grabados (" + Math.round(idleBlob.size / 1024) + " KB)";
+    $("idleBadge").classList.add("ok");
+  });
+
+  // ── 5 · Previsualizar con el renderer real y boca sintética ──
+  let previewRenderer = null, previewTimer = 0;
+  $("btnPreview").addEventListener("click", async () => {
+    if (!baseBlob || !marks.mouth || !marks.chin) { alert("Faltan el fotograma base, la boca o la barbilla."); return; }
+    if (previewRenderer) { previewRenderer.dispose(); clearInterval(previewTimer); }
+    previewRenderer = new Hybrid2DRenderer($("previewCanvas"));
+    await previewRenderer.load(buildIdentity(URL.createObjectURL(baseBlob), idleBlob ? URL.createObjectURL(idleBlob) : null));
+    previewRenderer.setState("speaking");
+    previewRenderer.start();
+    const t0 = performance.now();
+    previewTimer = setInterval(() => {
+      const t = (performance.now() - t0) / 1000;
+      const word = Math.sin(t * 0.9) > -0.6 ? 1 : 0;
+      const open = word * Math.max(0, Math.sin(t * Math.PI * 4.2)) * 0.8;
+      previewRenderer.setMouth({ open, width: 1 + 0.08 * Math.sin(t * 2.1) });
+    }, 16);
+  });
+
+  function buildIdentity(imageUrl, idleUrl) {
+    const eyes = [marks.eyeL, marks.eyeR].filter(Boolean);
+    return {
+      name: $("slug").value || "avatar",
+      image: imageUrl, idleVideo: idleUrl,
+      width: W, height: H,
+      mouth: marks.mouth, chinY: marks.chin,
+      eyes: eyes.length ? eyes : null,
+      skin: null, innerMouth: "#2c1215",
+    };
+  }
+
+  // ── 6 · Exportar archivos ──
+  $("btnExport").addEventListener("click", () => {
+    if (!baseBlob || !marks.mouth || !marks.chin) { alert("Faltan el fotograma base, la boca o la barbilla."); return; }
+    const slug = ($("slug").value || "avatar").toLowerCase().replace(/[^\w-]/g, "");
+    const id = buildIdentity("base.jpg", idleBlob ? "idle.webm" : null);
+    download(slug + "-identity.json", new Blob([JSON.stringify(id, null, 2)], { type: "application/json" }));
+    download(slug + "-base.jpg", baseBlob);
+    if (idleBlob) download(slug + "-idle.webm", idleBlob);
+  });
+
+  function download(name, blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+</script>
+</body>
+</html>

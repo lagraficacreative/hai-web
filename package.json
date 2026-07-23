@@ -5,13 +5,18 @@
   "description": "Web + cerebro de HAI Memories (chat IA y voz clonada)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build:avatar-vendor": "esbuild tools/vendor-entry.mjs --bundle --format=esm --minify --outfile=public/avatar-live/vendor/elevenlabs-client.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "@elevenlabs/client": "^1.15.2",
     "express": "^4.19.2",
     "multer": "^2.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
   }
 }

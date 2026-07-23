@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200">
+  <!-- Retrato ilustrado de prueba para el módulo avatar-live.
+       Se sustituye por la identidad real (frames del vídeo de registro). -->
+  <defs>
+    <linearGradient id="shirt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#343a5e"/>
+      <stop offset="1" stop-color="#23273f"/>
+    </linearGradient>
+    <radialGradient id="cheek" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#e59c86" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#e59c86" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- cuello -->
+  <path d="M400 600 L400 780 Q450 810 500 780 L500 600 Z" fill="#dfae8e"/>
+  <path d="M400 640 Q450 690 500 640 L500 700 Q450 740 400 700 Z" fill="#c99676" opacity="0.55"/>
+
+  <!-- torso -->
+  <path d="M450 745
+           C330 750 250 800 215 880
+           C185 950 172 1060 168 1200
+           L732 1200
+           C728 1060 715 950 685 880
+           C650 800 570 750 450 745 Z" fill="url(#shirt)"/>
+  <path d="M382 760 Q450 830 518 760 Q520 800 450 826 Q380 800 382 760 Z" fill="#e9bd9f"/>
+
+  <!-- orejas -->
+  <ellipse cx="262" cy="452" rx="30" ry="46" fill="#e2b190"/>
+  <ellipse cx="638" cy="452" rx="30" ry="46" fill="#e2b190"/>
+
+  <!-- cara -->
+  <path d="M450 172
+           C330 172 258 262 254 400
+           C251 500 280 580 330 626
+           C370 662 410 678 450 678
+           C490 678 530 662 570 626
+           C620 580 649 500 646 400
+           C642 262 570 172 450 172 Z" fill="#e9bd9f"/>
+
+  <!-- pelo -->
+  <path d="M450 150
+           C312 150 240 246 246 392
+           C247 420 250 444 254 462
+           C258 420 270 402 282 380
+           C290 424 306 436 318 442
+           C312 396 322 372 338 350
+           C368 384 430 398 482 392
+           C540 386 580 364 600 334
+           C620 360 630 396 628 444
+           C644 430 654 410 658 380
+           C666 398 672 420 674 452
+           C680 430 686 408 686 386
+           C688 244 588 150 450 150 Z" fill="#4a3628"/>
+
+  <!-- cejas -->
+  <path d="M330 380 Q375 362 412 376" stroke="#5b4433" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <path d="M488 376 Q525 362 570 380" stroke="#5b4433" stroke-width="14" stroke-linecap="round" fill="none"/>
+
+  <!-- ojos (centros en y≈420) -->
+  <g>
+    <ellipse cx="375" cy="420" rx="36" ry="17" fill="#fdf8f2"/>
+    <circle cx="377" cy="420" r="12.5" fill="#5d4130"/>
+    <circle cx="377" cy="420" r="5.5" fill="#241812"/>
+    <circle cx="381" cy="416" r="2.2" fill="#fff"/>
+    <path d="M339 418 Q375 398 411 418" stroke="#c99676" stroke-width="4" fill="none" opacity="0.7"/>
+  </g>
+  <g>
+    <ellipse cx="525" cy="420" rx="36" ry="17" fill="#fdf8f2"/>
+    <circle cx="523" cy="420" r="12.5" fill="#5d4130"/>
+    <circle cx="523" cy="420" r="5.5" fill="#241812"/>
+    <circle cx="527" cy="416" r="2.2" fill="#fff"/>
+    <path d="M489 418 Q525 398 561 418" stroke="#c99676" stroke-width="4" fill="none" opacity="0.7"/>
+  </g>
+
+  <!-- nariz -->
+  <path d="M450 440 L444 520 Q450 534 466 524" stroke="#cf9d7c" stroke-width="7" stroke-linecap="round" fill="none"/>
+
+  <!-- mejillas -->
+  <ellipse cx="342" cy="500" rx="46" ry="30" fill="url(#cheek)"/>
+  <ellipse cx="558" cy="500" rx="46" ry="30" fill="url(#cheek)"/>
+
+  <!-- boca cerrada (rect de identidad: x395 y560 w110 h36) -->
+  <path d="M398 578 Q426 566 450 572 Q474 566 502 578 Q474 596 450 594 Q426 596 398 578 Z" fill="#b96b62"/>
+  <path d="M400 578 Q450 588 500 578" stroke="#8e4a45" stroke-width="4" stroke-linecap="round" fill="none"/>
+</svg>

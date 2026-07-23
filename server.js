@@ -631,11 +631,81 @@ app.get("/api/avatar-embed", async (req, res) => {
   }
 });
 
+// ── ElevenLabs Agents: avatar conversacional propio (módulo avatar-live) ──
+// El navegador NUNCA ve la API key: pide aquí un token efímero de sesión.
+// El agente se localiza por env ELEVENLABS_AGENT_ID o se crea una vez por nombre
+// (mismo patrón que los contexts de LiveAvatar). La clave necesita los permisos
+// de Agents (ConvAI) además de text_to_speech.
+const XI_AGENT_ID = process.env.ELEVENLABS_AGENT_ID || "";
+const XI_AGENT_NAME = "HAI asistente web (avatar-live) v1";
+let xiAgentCache = XI_AGENT_ID || null;
+
+async function xiApi(pathName, opts = {}) {
+  const res = await fetch("https://api.elevenlabs.io" + pathName, {
+    ...opts,
+    headers: { "content-type": "application/json", "xi-api-key": XI_KEY, ...(opts.headers || {}) },
+  });
+  if (!res.ok) throw new Error("elevenlabs " + pathName + " " + res.status + " " + (await res.text()).slice(0, 200));
+  return res.json();
+}
+
+async function ensureXiAgent() {
+  if (xiAgentCache) return xiAgentCache;
+  const list = await xiApi("/v1/convai/agents?page_size=100").catch(() => null);
+  const existing = list && (list.agents || []).find((a) => a.name === XI_AGENT_NAME);
+  if (existing) {
+    xiAgentCache = existing.agent_id;
+    return xiAgentCache;
+  }
+  const created = await xiApi("/v1/convai/agents/create", {
+    method: "POST",
+    body: JSON.stringify({
+      name: XI_AGENT_NAME,
+      conversation_config: {
+        agent: {
+          first_message: WEB_OPENING,
+          language: "es",
+          prompt: { prompt: WEB_PERSONA + "\n\n" + GUARDRAILS },
+        },
+        ...(XI_VOICE ? { tts: { voice_id: XI_VOICE } } : {}),
+      },
+    }),
+  });
+  xiAgentCache = created.agent_id;
+  console.log("Agente de ElevenLabs creado:", xiAgentCache, "→ fija ELEVENLABS_AGENT_ID=" + xiAgentCache + " en Coolify");
+  return xiAgentCache;
+}
+
+app.get("/api/agents/token", async (req, res) => {
+  if (!XI_KEY) return res.status(503).json({ error: "avatar_no_configurado" });
+  if (!rateLimit(clientIp(req), "agent-token", 30)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  try {
+    const agentId = await ensureXiAgent();
+    try {
+      // WebRTC (preferido: menos latencia y gestión de audio más robusta)
+      const t = await xiApi("/v1/convai/conversation/token?agent_id=" + agentId);
+      return res.json({ token: t.token, agentId });
+    } catch (e) {
+      // Respaldo: WebSocket con URL firmada
+      const s = await xiApi("/v1/convai/conversation/get-signed-url?agent_id=" + agentId);
+      return res.json({ signedUrl: s.signed_url, agentId });
+    }
+  } catch (err) {
+    console.error("agents token error:", err.message);
+    res.status(502).json({ error: "error_avatar", detail: err.message.slice(0, 300) });
+  }
+});
+
+// Rutas limpias del módulo avatar-live (avatar.html de LiveAvatar sigue intacto)
+app.get("/avatar", (_req, res) => res.sendFile(path.join(__dirname, "public", "avatar-live", "avatar.html")));
+app.get("/hologram", (_req, res) => res.sendFile(path.join(__dirname, "public", "avatar-live", "hologram.html")));
+
 app.get("/api/health", (_req, res) => {
   res.json({
     chat: !!(ANTHROPIC_KEY || OPENAI_KEY),
     tts: !!(XI_KEY && XI_VOICE),
     avatar: !!HEYGEN_KEY,
+    avatarLive: !!XI_KEY,
     accounts: true,
   });
 });

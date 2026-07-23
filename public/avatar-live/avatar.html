@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HAI · Habla con el Human AI en tiempo real</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:#0A0A0F; --surface:#12121A; --surface2:#1A1A26; --border:#26263A;
+    --text:#F4F4F8; --dim:#9A9AB0; --primary:#7C6AF7; --glow:#A78BFA;
+    --accent:#22D3EE; --success:#34D399; --danger:#F87171; --warn:#FBBF24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:"Inter",system-ui,sans-serif;line-height:1.55;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+  h1{font-family:"Sora",sans-serif;letter-spacing:-.02em;font-size:clamp(19px,4vw,25px);text-align:center}
+  a{color:inherit;text-decoration:none}
+  .grad-text{background:linear-gradient(135deg,#7C6AF7,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .logo{font-family:"Sora";font-weight:700;font-size:18px}
+  header a.back{color:var(--dim);font-size:13px}
+  header a.back:hover,header a.back:focus-visible{color:var(--text)}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 16px;gap:12px}
+  .sub{color:var(--dim);font-size:14px;text-align:center;max-width:520px}
+  .stage{position:relative;height:min(62vh,640px);aspect-ratio:3/4;max-width:92vw;background:radial-gradient(ellipse at 50% 30%,#181828,#0d0d14 70%);border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:0 0 48px rgba(124,106,247,.16)}
+  canvas{width:100%;height:100%;display:block}
+  .status{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:rgba(10,10,15,.72);border:1px solid var(--border);border-radius:999px;padding:6px 14px;font-size:13px;color:var(--dim);backdrop-filter:blur(6px)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);transition:background .25s}
+  .status[data-state="listening"] .dot{background:var(--success);animation:blink 1.6s infinite}
+  .status[data-state="thinking"] .dot{background:var(--warn);animation:blink .9s infinite}
+  .status[data-state="speaking"] .dot{background:var(--accent)}
+  .status[data-state="connecting"] .dot{background:var(--glow);animation:blink .7s infinite}
+  .status[data-state="interrupted"] .dot{background:var(--warn)}
+  .status[data-state="error"] .dot{background:var(--danger)}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+  .controls{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  button{font-family:"Inter";font-size:15px;font-weight:600;border:0;border-radius:14px;padding:13px 26px;cursor:pointer;transition:transform .12s,box-shadow .12s}
+  button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  button:active{transform:scale(.97)}
+  .btn-talk{background:linear-gradient(135deg,#7C6AF7,#22D3EE);color:#fff;box-shadow:0 6px 24px rgba(124,106,247,.35)}
+  .btn-talk:disabled{opacity:.55;cursor:wait}
+  .btn-end{background:var(--surface2);color:var(--danger);border:1px solid var(--border);display:none}
+  .btn-end.visible{display:inline-block}
+  .error{display:none;color:var(--danger);background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.35);border-radius:12px;padding:10px 16px;font-size:13.5px;max-width:520px;text-align:center}
+  .error.visible{display:block}
+  .note{color:var(--dim);font-size:12px;text-align:center;max-width:480px}
+  .demo-badge{display:none;position:absolute;top:12px;right:12px;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);color:var(--warn);font-size:11px;padding:3px 10px;border-radius:999px}
+  footer{padding:12px 20px;border-top:1px solid var(--border);color:var(--dim);font-size:12px;text-align:center}
+  @media (max-height:640px){ .sub{display:none} .stage{height:52vh} }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><a href="/index.html"><span class="grad-text">HAI</span> · Avatar en tiempo real</a></div>
+  <a class="back" href="/index.html">← Volver a la web</a>
+</header>
+
+<main>
+  <h1>Habla con el <span class="grad-text">Human AI</span></h1>
+  <p class="sub">Pulsa «Hablar con HAI», permite el micrófono y conversa con naturalidad. Puedes interrumpirle mientras habla, como a una persona.</p>
+
+  <div class="stage" id="stage">
+    <canvas id="avatarCanvas" aria-label="Avatar de HAI"></canvas>
+    <div class="status" id="status" data-state="idle" role="status" aria-live="polite">
+      <span class="dot"></span><span id="statusText">Preparado</span>
+    </div>
+    <span class="demo-badge" id="demoBadge">modo demo</span>
+  </div>
+
+  <div class="error" id="error" role="alert"></div>
+
+  <div class="controls">
+    <button class="btn-talk" id="btnTalk">🎙️ Hablar con HAI</button>
+    <button class="btn-end" id="btnEnd">Finalizar</button>
+  </div>
+
+  <p class="note">Estás hablando con un ser digital creado con inteligencia artificial, no con una persona real.</p>
+</main>
+
+<footer>© 2026 HAI — Human AI Experiences · La Gràfica Creative</footer>
+
+<script type="module">
+  import { HaiAvatar } from "/avatar-live/hai-avatar.js";
+
+  const params = new URLSearchParams(location.search);
+  const demo = params.get("demo") === "1";
+  const identity = (params.get("id") || "demo").replace(/[^\w-]/g, "");
+
+  const statusEl = document.getElementById("status");
+  const statusText = document.getElementById("statusText");
+  const errorEl = document.getElementById("error");
+  const btnTalk = document.getElementById("btnTalk");
+  const btnEnd = document.getElementById("btnEnd");
+  if (demo) document.getElementById("demoBadge").style.display = "block";
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.classList.add("visible");
+  }
+  function clearError() { errorEl.classList.remove("visible"); }
+
+  const avatar = new HaiAvatar({
+    canvas: document.getElementById("avatarCanvas"),
+    identityUrl: `/avatar-live/identities/${identity}/identity.json`,
+    demo,
+    onState: (state, label) => {
+      statusEl.dataset.state = state;
+      statusText.textContent = label;
+      if (state === "ended") {
+        btnTalk.style.display = "inline-block";
+        btnEnd.classList.remove("visible");
+        btnTalk.disabled = false;
+      }
+    },
+    onError: showError,
+  });
+
+  avatar.load().catch(() => showError("No se ha podido cargar el avatar. Recarga la página."));
+  window.__hai = avatar; // hook de depuración (estado y boca en consola)
+
+  btnTalk.addEventListener("click", async () => {
+    clearError();
+    btnTalk.disabled = true;
+    try {
+      await avatar.startConversation();
+      btnTalk.style.display = "none";
+      btnTalk.disabled = false;
+      btnEnd.classList.add("visible");
+    } catch (e) {
+      btnTalk.disabled = false;
+    }
+  });
+
+  btnEnd.addEventListener("click", async () => {
+    btnEnd.disabled = true;
+    await avatar.stopConversation();
+    btnEnd.disabled = false;
+    btnEnd.classList.remove("visible");
+    btnTalk.style.display = "inline-block";
+  });
+
+  // Liberar micro/WebRTC al salir de la página
+  window.addEventListener("pagehide", () => avatar.dispose());
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "HAI (avatar de prueba)",
+  "image": "demo.svg",
+  "idleVideo": null,
+  "width": 900,
+  "height": 1200,
+  "mouth": { "x": 395, "y": 560, "w": 110, "h": 36 },
+  "chinY": 672,
+  "eyes": [
+    { "x": 339, "y": 403, "w": 72, "h": 34 },
+    { "x": 489, "y": 403, "w": 72, "h": 34 }
+  ],
+  "skin": "#e9bd9f",
+  "innerMouth": "#3a171b"
+}
