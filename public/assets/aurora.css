@@ -1,0 +1,34 @@
+/* Aurora — fondo interactivo para .hero-bg de todas las páginas de HAI.
+   Blobs desenfocados (sin grano) azul + turquesa que siguen el ratón con
+   inercia. En móvil se animan solos con una curva de Lissajous lenta.
+   No cambia nada del contenido del hero: se inyectan capas debajo. */
+
+.hero{isolation:isolate}                     /* aísla los blur del resto de la página */
+.hero-bg{background:#0D3A63 !important;      /* base sólida entre los blobs */
+  overflow:hidden}
+.hero-bg .aurora-blob{
+  position:absolute;border-radius:50%;pointer-events:none;
+  will-change:transform;transition:transform 900ms cubic-bezier(.22,.9,.36,1)
+}
+@media (prefers-reduced-motion: reduce){
+  .hero-bg .aurora-blob{transition:none}
+}
+.hero-bg .aurora-blob.b1{
+  width:70vmax;height:70vmax;left:-15vmax;top:-20vmax;
+  background:radial-gradient(circle at 40% 40%,#4AA6FF 0,#4AA6FF 30%,rgba(74,166,255,0) 70%);
+  filter:blur(90px);opacity:.85
+}
+.hero-bg .aurora-blob.b2{
+  width:60vmax;height:60vmax;right:-12vmax;bottom:-18vmax;
+  background:radial-gradient(circle at 60% 60%,#4FE7DF 0,#4FE7DF 30%,rgba(79,231,223,0) 70%);
+  filter:blur(85px);opacity:.75;mix-blend-mode:screen
+}
+.hero-bg .aurora-blob.b3{
+  width:45vmax;height:45vmax;left:35%;top:25%;
+  background:radial-gradient(circle at 50% 50%,#8FB8FF 0,#8FB8FF 25%,rgba(143,184,255,0) 65%);
+  filter:blur(100px);opacity:.32;mix-blend-mode:screen
+}
+.hero-bg .aurora-veil{
+  position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 55%,rgba(3,15,28,.35) 0,rgba(3,15,28,0) 60%)
+}
