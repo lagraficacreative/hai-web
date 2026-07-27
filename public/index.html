@@ -57,6 +57,16 @@
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
   .chip{background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:7px 14px;font-size:13px;color:var(--dim)}
   .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:44px}
+  .format-card{padding:16px}
+  .format-card h3{margin-top:14px}
+  /* Hueco para la foto de cada dispositivo. Se compone en capas: la foto
+     real (si carga) tapa el gradiente placeholder; si falla el 404 el navegador
+     salta la capa de imagen y queda el gradiente coherente con la paleta. */
+  .format-img{aspect-ratio:16/10;border-radius:10px;
+    background:
+      var(--img, none) center/cover no-repeat,
+      linear-gradient(135deg,rgba(124,106,247,.18),rgba(34,211,238,.15)) center/cover,
+      #0F3963}
   @media (max-width:900px){.grid3{grid-template-columns:1fr 1fr}}
   @media (max-width:600px){.grid3{grid-template-columns:1fr}}
   .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:44px}
@@ -206,15 +216,41 @@
     <h2 class="section-title">Un mismo HAI, todos los formatos</h2>
     <p class="section-sub">La inteligencia vive en la nube. El dispositivo es solo la ventana por la que aparece.</p>
     <div class="grid3">
-      <div class="card"><h3 style="font-size:15px">🌐 Página web</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Tu HAI recibe a los visitantes de tu web y conversa con ellos, como en esta misma página.</p></div>
-      <div class="card"><h3 style="font-size:15px">📱 Aplicación móvil</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Una app instalable (PWA) para llevar tu HAI en el bolsillo.</p></div>
-      <div class="card"><h3 style="font-size:15px">📹 Videollamada</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Tu HAI se incorpora a reuniones y atención remota cara a cara.</p></div>
-      <div class="card"><h3 style="font-size:15px">🌀 Ventilador holográfico</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Presencia flotante y espectacular para escaparates, recepciones y stands.</p></div>
-      <div class="card"><h3 style="font-size:15px">🔮 Cabina holográfica</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Tamaño real. La experiencia más impactante para eventos y museos.</p></div>
-      <div class="card"><h3 style="font-size:15px">🪟 Pantalla transparente</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">El HAI aparece integrado en vitrinas y espacios comerciales.</p></div>
-      <div class="card"><h3 style="font-size:15px">🖥️ Quioscos y pantallas táctiles</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Puntos de atención e información autónomos, 24/7.</p></div>
-      <div class="card"><h3 style="font-size:15px">🤖 Robots humanoides</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">El HAI toma cuerpo físico para recibir y acompañar.</p></div>
-      <div class="card"><h3 style="font-size:15px">🥽 Vision Pro y Meta Quest</h3><p style="color:var(--dim);font-size:13px;margin-top:6px">Experiencias inmersivas en realidad mixta y virtual.</p></div>
+      <div class="card format-card">
+        <div class="format-img" style="--img:url('/images/formatos/web.jpg')"></div>
+        <h3 style="font-size:15px">🌐 Página web</h3>
+        <p style="color:var(--dim);font-size:13px;margin-top:6px">Tu HAI recibe a los visitantes de tu web y conversa con ellos, como en esta misma página.</p>
+      </div>
+      <div class="card format-card">
+        <div class="format-img" style="--img:url('/images/formatos/app.jpg')"></div>
+        <h3 style="font-size:15px">📱 Aplicación móvil</h3>
+        <p style="color:var(--dim);font-size:13px;margin-top:6px">Una app instalable (PWA) para llevar tu HAI en el bolsillo.</p>
+      </div>
+      <div class="card format-card">
+        <div class="format-img" style="--img:url('/images/formatos/videollamada.jpg')"></div>
+        <h3 style="font-size:15px">📹 Videollamada</h3>
+        <p style="color:var(--dim);font-size:13px;margin-top:6px">Tu HAI se incorpora a reuniones y atención remota cara a cara.</p>
+      </div>
+      <div class="card format-card">
+        <div class="format-img" style="--img:url('/images/formatos/ventilador.jpg')"></div>
+        <h3 style="font-size:15px">🌀 Ventilador holográfico</h3>
+        <p style="color:var(--dim);font-size:13px;margin-top:6px">Presencia flotante y espectacular para escaparates, recepciones y stands.</p>
+      </div>
+      <div class="card format-card">
+        <div class="format-img" style="--img:url('/images/formatos/cabina.jpg')"></div>
+        <h3 style="font-size:15px">🔮 Cabina holográfica</h3>
+        <p style="color:var(--dim);font-size:13px;margin-top:6px">Tamaño real. La experiencia más impactante para eventos y museos.</p>
+      </div>
+      <div class="card format-card">
+        <div class="format-img" style="--img:url('/images/formatos/pantalla.jpg')"></div>
+        <h3 style="font-size:15px">🪟 Pantalla transparente</h3>
+        <p style="color:var(--dim);font-size:13px;margin-top:6px">El HAI aparece integrado en vitrinas y espacios comerciales.</p>
+      </div>
+      <div class="card format-card">
+        <div class="format-img" style="--img:url('/images/formatos/quiosco.jpg')"></div>
+        <h3 style="font-size:15px">🖥️ Quioscos y pantallas táctiles</h3>
+        <p style="color:var(--dim);font-size:13px;margin-top:6px">Puntos de atención e información autónomos, 24/7.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -227,7 +263,7 @@
       <div class="card step"><div class="num">1</div><h3>Definimos su identidad</h3><p>Quién es, cómo habla, qué carácter tiene. Su rostro: una persona real, un personaje o una imagen creada digitalmente.</p></div>
       <div class="card step"><div class="num">2</div><h3>Le damos conocimientos</h3><p>Tu catálogo, tus documentos, tu historia, tus preguntas frecuentes. Solo responde con lo que sabe.</p></div>
       <div class="card step"><div class="num">3</div><h3>Creamos rostro y voz</h3><p>Clonamos una voz real o diseñamos una nueva, y damos vida a su imagen con gestos y expresiones naturales.</p></div>
-      <div class="card step"><div class="num">4</div><h3>Lo publicamos donde quieras</h3><p>Web, app, pantalla, holograma o robot. Y lo acompañamos: mejora con cada conversación.</p></div>
+      <div class="card step"><div class="num">4</div><h3>Lo publicamos donde quieras</h3><p>Web, app, pantalla o holograma. Y lo acompañamos: mejora con cada conversación.</p></div>
     </div>
   </div>
 </section>
