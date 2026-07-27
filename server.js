@@ -1228,6 +1228,76 @@ app.get("/api/avatar-embed", async (req, res) => {
   }
 });
 
+// ── Simli: cara neuronal con lipsync que va sobre ElevenLabs Agents ──
+// La API key vive SOLO en el servidor; el navegador pide aquí un session token.
+const SIMLI_KEY = process.env.SIMLI_API_KEY || "";
+const SIMLI_FACE = process.env.SIMLI_FACE_ID || "";
+
+app.post("/api/simli/token", async (req, res) => {
+  if (!SIMLI_KEY || !SIMLI_FACE) return res.status(503).json({ error: "simli_no_configurado" });
+  if (!rateLimit(clientIp(req), "simli-token", 20)) return res.status(429).json({ error: "demasiadas_peticiones" });
+  try {
+    const r = await fetch("https://api.simli.ai/startAudioToVideoSession", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        apiKey: SIMLI_KEY,
+        faceId: (req.body && req.body.face_id) || SIMLI_FACE,
+        syncAudio: true,
+        maxSessionLength: Number((req.body && req.body.maxSessionLength) || 600),
+        maxIdleTime: 60,
+        handleSilence: true,
+      }),
+    });
+    if (!r.ok) throw new Error("simli " + r.status + " " + (await r.text()).slice(0, 200));
+    const data = await r.json();
+    res.json({ session_token: data.session_token || data.roomUrl || data, face_id: SIMLI_FACE });
+  } catch (err) {
+    console.error("simli token error:", err.message);
+    res.status(502).json({ error: "error_simli", detail: err.message.slice(0, 300) });
+  }
+});
+
+// ── Agentes especializados por experiencia (una personalidad por landing) ──
+// Cada landing (Business/Events/Museum/Tourism/Education/Home Live) tiene su
+// propio agente ElevenLabs con una personalidad concreta. Los IDs generados
+// se guardan en /app/data/exp-agents.json para no tener que recrearlos.
+const EXP_PERSONAS = {
+  business: `Eres una recepcionista digital de HAI Business para empresas. Recibes al visitante de la web con calidez y profesionalidad, cuentas qué hace HAI Business (asistentes 24/7 que atienden visitas y responden sobre los servicios de una empresa), y le animas a pedir una demo escribiendo a ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) con tono cercano y BREVE (2-4 frases, se dicen en voz alta). No des precios: se presupuesta a medida.`,
+  events: `Eres una presentadora holográfica de HAI Events para ferias y eventos. Con energía y elegancia, cuentas que un HAI puede presentar la agenda de un evento, dinamizar un stand y atraer público sin cansarse. Invitas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) con tono desenvuelto y BREVE (2-4 frases). No des precios: se presupuesta a medida.`,
+  museum: `Eres una guía digital de HAI Museum. Con voz reposada y culta, cuentas que un HAI puede recibir a los visitantes de un museo como un personaje histórico (Cleopatra, Ramon Llull, quien quiera el museo) y contar su historia en primera persona. Animas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases). No inventes exposiciones concretas. No des precios: se presupuesta a medida.`,
+  tourism: `Eres una conserje digital 24 h de HAI Tourism. Con acogida cálida y práctica, cuentas que un HAI puede atender a los huéspedes de un hotel o los visitantes de un destino en varios idiomas, dar recomendaciones locales y resolver dudas a cualquier hora. Invitas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases). No des precios: se presupuesta a medida.`,
+  education: `Eres una tutora digital de HAI Education. Con paciencia infinita y tono claro, cuentas que un HAI puede acompañar al alumnado con el temario del centro, resolver dudas cuantas veces haga falta y adaptarse al ritmo de cada persona. Invitas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases). No des precios: se presupuesta a medida.`,
+  homelive: `Eres la voz de HAI Home Live: presencia holográfica en casa con dos modos — IA (compañía 24/7, ideal para personas mayores) y humano (una persona real aparece por videollamada en el holograma, como si estuviera allí). Cuentas ambos modos con cariño, sin idealizar. Invitas a pedir información en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases). No des precios: se presupuesta a medida.`,
+};
+
+const EXP_AGENTS_FILE = path.join(DATA_DIR, "exp-agents.json");
+function readExpAgents() { try { return JSON.parse(fs.readFileSync(EXP_AGENTS_FILE, "utf8")); } catch (e) { return {}; } }
+function writeExpAgents(m) { fs.writeFileSync(EXP_AGENTS_FILE, JSON.stringify(m, null, 2)); }
+
+async function ensureExpAgent(exp) {
+  const map = readExpAgents();
+  if (map[exp]) return map[exp];
+  const created = await xiApi("/v1/convai/agents/create", {
+    method: "POST",
+    body: JSON.stringify({
+      name: "HAI · experiencia " + exp,
+      conversation_config: {
+        agent: {
+          language: "es",
+          prompt: { prompt: EXP_PERSONAS[exp] + "\n\n" + GUARDRAILS },
+        },
+        tts: { model_id: "eleven_flash_v2_5", ...(XI_VOICE ? { voice_id: XI_VOICE } : {}) },
+        conversation: { client_events: XI_CLIENT_EVENTS },
+      },
+    }),
+  });
+  map[exp] = created.agent_id;
+  writeExpAgents(map);
+  console.log("Agente ElevenLabs creado para experiencia", exp + ":", created.agent_id);
+  return created.agent_id;
+}
+
 // ── ElevenLabs Agents: avatar conversacional propio (módulo avatar-live) ──
 // El navegador NUNCA ve la API key: pide aquí un token efímero de sesión.
 // El agente se localiza por env ELEVENLABS_AGENT_ID o se crea una vez por nombre
@@ -1325,7 +1395,10 @@ app.get("/api/agents/token", async (req, res) => {
   if (!rateLimit(clientIp(req), "agent-token", 30)) return res.status(429).json({ error: "demasiadas_peticiones" });
   try {
     let agentId;
-    if (req.query.human === "me") {
+    if (req.query.exp && EXP_PERSONAS[req.query.exp]) {
+      // Agentes especializados por landing de experiencia (business/events/...)
+      agentId = await ensureExpAgent(req.query.exp);
+    } else if (req.query.human === "me") {
       const u = currentUser(req);
       if (!u) return res.status(401).json({ error: "no_autenticado" });
       const h = db.prepare("SELECT agent_id FROM humans WHERE user_id = ?").get(u.id);
