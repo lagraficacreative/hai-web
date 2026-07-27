@@ -1246,7 +1246,10 @@ app.post("/api/simli/token", async (req, res) => {
         syncAudio: true,
         maxSessionLength: Number((req.body && req.body.maxSessionLength) || 600),
         maxIdleTime: 60,
-        handleSilence: true,
+        // handleSilence=false: la boca se queda quieta cuando no llega audio del
+        // agente. Con true, Simli inventa movimiento en los silencios y la boca
+        // no para de moverse aunque el agente esté callado.
+        handleSilence: false,
       }),
     });
     if (!r.ok) throw new Error("simli " + r.status + " " + (await r.text()).slice(0, 200));

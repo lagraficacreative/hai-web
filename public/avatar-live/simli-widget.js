@@ -226,7 +226,14 @@ class SimliHaiSession {
       },
       onDisconnect: () => this.setState("ended"),
       onError: (msg) => this.showError("La conversación se ha cortado (" + String(msg).slice(0, 120) + ")."),
-      onModeChange: ({ mode }) => this.setState(mode === "speaking" ? "speaking" : "listening"),
+      onModeChange: ({ mode }) => {
+        this.setState(mode === "speaking" ? "speaking" : "listening");
+        // Cuando el agente termina una frase, limpiar buffer de Simli para que
+        // la boca se cierre limpia y no quede "por reproducir" nada de la frase anterior
+        if (mode !== "speaking" && this.simli && this.simli.ClearBuffer) {
+          try { this.simli.ClearBuffer(); } catch (e) {}
+        }
+      },
       onMessage: (m) => {
         if (m && m.source === "user") this.setState("thinking");
       },
