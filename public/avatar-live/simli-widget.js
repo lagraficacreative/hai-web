@@ -178,22 +178,41 @@ class SimliHaiSession {
     this.simli.on("error", (e) => this.showError("Se ha cortado la cara del avatar. Cierra y vuelve a abrir."));
     await this.simli.start();
 
-    // 4) Interceptar el <audio> que el SDK de ElevenLabs adjunta al DOM
-    //    y encaminarlo a Simli para el lipsync. Silenciamos el reproductor
-    //    del SDK con setVolume(0) para no oír el audio dos veces.
-    this.mo = new MutationObserver((records) => {
-      for (const r of records) {
-        for (const n of r.addedNodes) {
-          if (n.tagName === "AUDIO" && n !== this.audio && !n.dataset.haiHooked) {
-            n.dataset.haiHooked = "1";
-            n.volume = 0;
-            n.muted = true;
-            try { this.simli.listenToAudioElement(n); } catch (err) { console.warn("simli listen error:", err); }
-          }
-        }
+    // 4) Encaminar el audio del agente de ElevenLabs a Simli para el lipsync.
+    //    El SDK crea un <audio> con srcObject = MediaStream (WebRTC/LiveKit).
+    //    Preferimos listenToMediastreamTrack(track) — el <audio> puede quedar
+    //    muted sin afectar al análisis, porque Simli usa el track directo.
+    //    Como LiveKit puede tardar en asignar el srcObject, combinamos
+    //    MutationObserver + poll durante 8 s.
+    const self = this;
+    self.hookedTrack = false;
+    const tryHook = (a) => {
+      if (self.hookedTrack || a === self.audio || a.dataset.haiHooked === "1") return false;
+      const so = a.srcObject;
+      const tracks = so && so.getAudioTracks && so.getAudioTracks();
+      if (!tracks || !tracks.length) return false; // aún no ha llegado el track
+      a.dataset.haiHooked = "1";
+      a.volume = 0; a.muted = true; // silenciamos SOLO la reproducción duplicada
+      try {
+        self.simli.listenToMediastreamTrack(tracks[0]);
+        console.log("[HAI] Simli enganchado al MediaStreamTrack del agente");
+        self.hookedTrack = true; return true;
+      } catch (err) {
+        console.warn("[HAI] listenToMediastreamTrack falló, fallback a listenToAudioElement:", err);
+        try { self.simli.listenToAudioElement(a); self.hookedTrack = true; return true; }
+        catch (e) { console.error("[HAI] Simli no ha podido escuchar el audio:", e); return false; }
       }
-    });
-    this.mo.observe(document.body, { childList: true, subtree: true });
+    };
+    const scanAll = () => document.querySelectorAll("audio").forEach(tryHook);
+    self.mo = new MutationObserver(scanAll);
+    self.mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "srcobject"] });
+    scanAll(); // por si el <audio> ya estaba antes de que empezáramos
+    let polls = 0;
+    self.pollHook = setInterval(() => {
+      polls++;
+      scanAll();
+      if (self.hookedTrack || polls > 30) { clearInterval(self.pollHook); self.pollHook = null; }
+    }, 300);
 
     // 5) ElevenLabs Agents. Preferimos WebRTC; si el token no llegó, WS firmado.
     const startOpts = xiAuth.token
@@ -217,6 +236,7 @@ class SimliHaiSession {
   async stop() {
     try { this.mo && this.mo.disconnect(); } catch (e) {}
     this.mo = null;
+    if (this.pollHook) { clearInterval(this.pollHook); this.pollHook = null; }
     if (this.conversation) { try { await this.conversation.endSession(); } catch (e) {} this.conversation = null; }
     if (this.simli) { try { await this.simli.stop(); } catch (e) {} this.simli = null; }
     // Quitar rastros: <audio> hookeados que dejó el SDK
