@@ -1,0 +1,72 @@
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="v-halo" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.55"/>
+      <stop offset="45%" stop-color="#7C6AF7" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0D3A63" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="v-figure" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#B7E7FF" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#22D3EE" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0.05"/>
+    </radialGradient>
+    <linearGradient id="v-base" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1E6ED8"/>
+      <stop offset="1" stop-color="#0A2438"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="500" fill="#0D3A63"/>
+  <rect width="800" height="500" fill="url(#v-halo)"/>
+
+  <!-- Aspas del ventilador holográfico: 3 aspas cruzadas, con motion-blur circular -->
+  <g transform="translate(400,225)">
+    <!-- Anillos guía muy sutiles -->
+    <circle r="200" fill="none" stroke="#7C6AF7" stroke-width="0.6" opacity="0.35"/>
+    <circle r="190" fill="none" stroke="#22D3EE" stroke-width="0.4" opacity="0.5"/>
+    <circle r="180" fill="none" stroke="#22D3EE" stroke-width="0.3" opacity="0.4"/>
+
+    <!-- Rastro del giro (arcos suaves que simulan movimiento) -->
+    <g opacity="0.55" stroke-linecap="round" fill="none">
+      <path d="M -180 0 A 180 180 0 0 1 90 -156" stroke="#22D3EE" stroke-width="2.2"/>
+      <path d="M 180 0 A 180 180 0 0 1 -90 156" stroke="#7C6AF7" stroke-width="2.2"/>
+      <path d="M -155 -90 A 180 180 0 0 1 155 -90" stroke="#A78BFA" stroke-width="1.6" opacity="0.7"/>
+    </g>
+
+    <!-- Aspas propiamente dichas — 3 palas finas con degradado -->
+    <g opacity="0.85">
+      <line x1="-175" y1="0" x2="175" y2="0" stroke="#B7E7FF" stroke-width="1.4" opacity="0.6"/>
+      <line x1="-155" y1="-88" x2="155" y2="88" stroke="#22D3EE" stroke-width="1.4" opacity="0.55"/>
+      <line x1="-88" y1="155" x2="88" y2="-155" stroke="#7C6AF7" stroke-width="1.4" opacity="0.55"/>
+    </g>
+
+    <!-- Motor central + LEDs -->
+    <circle r="16" fill="#0A2438" stroke="#22D3EE" stroke-width="1.2"/>
+    <circle r="4" fill="#22D3EE"/>
+
+    <!-- Figura holográfica flotante en el centro (proyección) -->
+    <g transform="translate(0,10)" opacity="0.92">
+      <ellipse cx="0" cy="0" rx="90" ry="120" fill="url(#v-figure)"/>
+      <!-- silueta persona de medio cuerpo, muy simplificada -->
+      <g fill="#F7FAFF" opacity="0.9">
+        <circle cx="0" cy="-55" r="18"/>
+        <path d="M-28,-32 Q-32,-8 -30,25 L-24,60 Q0,55 24,60 L30,25 Q32,-8 28,-32 Q14,-42 0,-42 Q-14,-42 -28,-32 Z"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- Base + soporte del ventilador -->
+  <rect x="392" y="425" width="16" height="30" fill="url(#v-base)"/>
+  <ellipse cx="400" cy="460" rx="90" ry="12" fill="#0A2438"/>
+  <ellipse cx="400" cy="458" rx="90" ry="12" fill="none" stroke="#22D3EE" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- Partículas de luz alrededor del aspa (sensación holográfica) -->
+  <g fill="#B7E7FF">
+    <circle cx="620" cy="180" r="1.6" opacity="0.7"/>
+    <circle cx="670" cy="260" r="1.2" opacity="0.5"/>
+    <circle cx="180" cy="150" r="1.4" opacity="0.6"/>
+    <circle cx="140" cy="320" r="1.2" opacity="0.5"/>
+    <circle cx="550" cy="90" r="1" opacity="0.4"/>
+    <circle cx="270" cy="380" r="1" opacity="0.5"/>
+  </g>
+</svg>
