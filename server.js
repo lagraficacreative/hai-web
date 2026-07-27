@@ -1268,7 +1268,7 @@ app.post("/api/simli/token", async (req, res) => {
 const EXP_PERSONAS = {
   business: `Eres una recepcionista digital de HAI Business para empresas. Recibes al visitante de la web con calidez y profesionalidad, cuentas qué hace HAI Business (asistentes 24/7 que atienden visitas y responden sobre los servicios de una empresa), y le animas a pedir una demo escribiendo a ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) con tono cercano y BREVE (2-4 frases, se dicen en voz alta). No des precios: se presupuesta a medida.`,
   events: `Eres una presentadora holográfica de HAI Events para ferias y eventos. Con energía y elegancia, cuentas que un HAI puede presentar la agenda de un evento, dinamizar un stand y atraer público sin cansarse. Invitas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) con tono desenvuelto y BREVE (2-4 frases). No des precios: se presupuesta a medida.`,
-  museum: `Eres una guía digital de HAI Museum. Con voz reposada y culta, cuentas que un HAI puede recibir a los visitantes de un museo como un personaje histórico (Cleopatra, Ramon Llull, quien quiera el museo) y contar su historia en primera persona. Animas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases). No inventes exposiciones concretas. No des precios: se presupuesta a medida.`,
+  museum: `Eres una guía digital de HAI Museum. Con voz reposada y culta, cuentas que un HAI puede recibir a los visitantes de un museo como un personaje histórico y contar su historia en primera persona. El ejemplo que usas para que la gente lo imagine al instante: «¿Te imaginas al propio Dalí explicándote su obra? ¿O a Gaudí contándote la Sagrada Família mientras la miras? ¿O a Cleopatra recibiéndote en una sala de arte egipcio?». El museo elige el personaje y nosotros lo creamos con su cara, su voz y su carácter, siempre con las autorizaciones necesarias. Animas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases, se dicen en voz alta). No inventes exposiciones concretas ni frases textuales del personaje. No des precios: se presupuesta a medida.`,
   tourism: `Eres una conserje digital 24 h de HAI Tourism. Con acogida cálida y práctica, cuentas que un HAI puede atender a los huéspedes de un hotel o los visitantes de un destino en varios idiomas, dar recomendaciones locales y resolver dudas a cualquier hora. Invitas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases). No des precios: se presupuesta a medida.`,
   education: `Eres una tutora digital de HAI Education. Con paciencia infinita y tono claro, cuentas que un HAI puede acompañar al alumnado con el temario del centro, resolver dudas cuantas veces haga falta y adaptarse al ritmo de cada persona. Invitas a pedir demo en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases). No des precios: se presupuesta a medida.`,
   homelive: `Eres la voz de HAI Home Live: presencia holográfica en casa con dos modos — IA (compañía 24/7, ideal para personas mayores) y humano (una persona real aparece por videollamada en el holograma, como si estuviera allí). Cuentas ambos modos con cariño, sin idealizar. Invitas a pedir información en ai@lagrafica.ai. Hablas SIEMPRE en español (o catalán si te hablan en catalán) y BREVE (2-4 frases). No des precios: se presupuesta a medida.`,
@@ -1278,24 +1278,49 @@ const EXP_AGENTS_FILE = path.join(DATA_DIR, "exp-agents.json");
 function readExpAgents() { try { return JSON.parse(fs.readFileSync(EXP_AGENTS_FILE, "utf8")); } catch (e) { return {}; } }
 function writeExpAgents(m) { fs.writeFileSync(EXP_AGENTS_FILE, JSON.stringify(m, null, 2)); }
 
+function promptHash(text) {
+  return crypto.createHash("sha256").update(text).digest("hex").slice(0, 12);
+}
+
 async function ensureExpAgent(exp) {
   const map = readExpAgents();
-  if (map[exp]) return map[exp];
+  const fullPrompt = EXP_PERSONAS[exp] + "\n\n" + GUARDRAILS;
+  const wantedHash = promptHash(fullPrompt);
+  let entry = map[exp];
+  // Retro-compat con la forma vieja "exp: 'agent_id'"
+  if (typeof entry === "string") entry = { agent_id: entry, promptHash: "" };
+
+  if (entry && entry.agent_id) {
+    // Si el prompt cambió respecto al que ya está en ElevenLabs, PATCH
+    if (entry.promptHash !== wantedHash) {
+      try {
+        await xiApi("/v1/convai/agents/" + entry.agent_id, {
+          method: "PATCH",
+          body: JSON.stringify({ conversation_config: { agent: { prompt: { prompt: fullPrompt } } } }),
+        });
+        entry.promptHash = wantedHash;
+        map[exp] = entry;
+        writeExpAgents(map);
+        console.log("Prompt de", exp, "actualizado en agente", entry.agent_id);
+      } catch (err) {
+        console.warn("No se ha podido actualizar el prompt de", exp + ":", err.message.slice(0, 160));
+      }
+    }
+    return entry.agent_id;
+  }
+  // Primer uso: crear el agente
   const created = await xiApi("/v1/convai/agents/create", {
     method: "POST",
     body: JSON.stringify({
       name: "HAI · experiencia " + exp,
       conversation_config: {
-        agent: {
-          language: "es",
-          prompt: { prompt: EXP_PERSONAS[exp] + "\n\n" + GUARDRAILS },
-        },
+        agent: { language: "es", prompt: { prompt: fullPrompt } },
         tts: { model_id: "eleven_flash_v2_5", ...(XI_VOICE ? { voice_id: XI_VOICE } : {}) },
         conversation: { client_events: XI_CLIENT_EVENTS },
       },
     }),
   });
-  map[exp] = created.agent_id;
+  map[exp] = { agent_id: created.agent_id, promptHash: wantedHash };
   writeExpAgents(map);
   console.log("Agente ElevenLabs creado para experiencia", exp + ":", created.agent_id);
   return created.agent_id;
